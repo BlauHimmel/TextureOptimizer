@@ -10,6 +10,12 @@ public:
     TextureOptimizer(TriMesh * pMesh, Texture * pTexture) : m_pMesh(pMesh), m_pTexture(pTexture) { }
     bool Run();
 
+    static std::vector<size_t> MeshComponentVertexNums(const TriMesh * pMesh);
+    static size_t MeshComponentCount(const TriMesh * pMesh);
+
+    static std::vector<size_t> MeshBoundaryLengths(const TriMesh * pMesh);
+    static size_t MeshBoundaryCount(const TriMesh * pMesh);
+
 private:
     TriMesh * m_pMesh;
     Texture * m_pTexture;
