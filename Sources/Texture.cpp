@@ -4,10 +4,8 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
-
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
-
 
 bool Texture::Create(uint32_t width, uint32_t height, uint32_t channel)
 {

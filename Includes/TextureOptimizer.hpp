@@ -10,11 +10,17 @@ public:
     TextureOptimizer(TriMesh * pMesh, Texture * pTexture) : m_pMesh(pMesh), m_pTexture(pTexture) { }
     bool Run();
 
+    static std::vector<std::vector<OpenMesh::VertexHandle>> MeshComponentVertices(const TriMesh * pMesh);
     static std::vector<size_t> MeshComponentVertexNums(const TriMesh * pMesh);
     static size_t MeshComponentCount(const TriMesh * pMesh);
 
+    static std::vector<std::vector<OpenMesh::VertexHandle>> MeshBoundaryVertices(const TriMesh * pMesh);
     static std::vector<size_t> MeshBoundaryLengths(const TriMesh * pMesh);
     static size_t MeshBoundaryCount(const TriMesh * pMesh);
+
+    static void RemoveSmallComponent(TriMesh * pMesh);
+    static void RepairNonManifold(TriMesh * pMesh);
+    static void CutToDisk(TriMesh * pMesh);
 
 private:
     TriMesh * m_pMesh;

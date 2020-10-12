@@ -7,7 +7,7 @@
 
 #include <OpenMesh/Core/IO/MeshIO.hh>
 #include <OpenMesh/Core/Geometry/EigenVectorT.hh>
-#include <OpenMesh/Core/Mesh/PolyMesh_ArrayKernelT.hh>
+#include <OpenMesh/Core/Mesh/TriMesh_ArrayKernelT.hh>
 
 struct MeshTraits : public OpenMesh::DefaultTraits
 {
@@ -18,7 +18,7 @@ struct MeshTraits : public OpenMesh::DefaultTraits
     using TexCoord3D = Eigen::Vector3d;
 };
 
-using TriMesh = OpenMesh::PolyMesh_ArrayKernelT<MeshTraits>;
+using TriMesh = OpenMesh::TriMesh_ArrayKernelT<MeshTraits>;
 using Real = TriMesh::Scalar;
 
 using Vector2 = Eigen::Matrix<Real, 2, 1>;
