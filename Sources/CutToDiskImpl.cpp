@@ -241,12 +241,10 @@ static void CutMesh(TriMesh * pMesh, const std::vector<std::vector<int>> & cuts)
             for (auto originHEH : pMesh->fh_range(originFH))
             {
                 auto originToVH = pMesh->to_vertex_handle(originHEH);
-                auto originFromVH = pMesh->from_vertex_handle(originHEH);
 
                 for (auto newHEH : newMesh.fh_range(newFH))
                 {
                     auto newToVH = newMesh.to_vertex_handle(newHEH);
-                    auto newFromVH = newMesh.from_vertex_handle(originHEH);
 
                     auto newToPoint = newMesh.point(newToVH);
                     auto originToPoint = pMesh->point(originToVH);
