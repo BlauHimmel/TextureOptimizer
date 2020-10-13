@@ -72,8 +72,14 @@ int main(int argc, const char ** argv)
 
     Logger::Info("Mesh info: %zd vertices, %zd faces, and %zd edges.", mesh.n_vertices(), mesh.n_faces(), mesh.n_edges());
 
+    Logger::Info("Optimizing the texture...");
     TextureOptimizer textureOptimizer(&mesh, &texture);
-    textureOptimizer.Run();
+    if (!textureOptimizer.Run())
+    {
+        Logger::Error("Could not optimize the texture!");
+        return 1;
+    }
+    Logger::Info("Successfully optimize the texture!");
 
     /* write texture */
     Logger::Info("Writing texture...");

@@ -1,9 +1,25 @@
 #include "TextureOptimizer.hpp"
 
 #include <algorithm>
+#include <limits>
+#include <mutex>
+#include <thread>
+#include <chrono>
+
+#include <progress_bar.h>
+#include <tbb/parallel_reduce.h>
+#include <tbb/blocked_range.h>
 
 #include "Logger.hpp"
 #include "CutToDiskImpl.hpp"
+
+#ifdef max
+#undef max
+#endif
+
+#ifdef min
+#undef min
+#endif
 
 bool TextureOptimizer::Run()
 {
@@ -12,9 +28,22 @@ bool TextureOptimizer::Run()
         return false;
     }
 
+    Logger::Info("Removing small components of the mesh...");
     RemoveSmallComponent(m_pMesh);
+    Logger::Info("<RemoveSmallComponent> Completed!");
+
+    Logger::Info("Repairing non-manifold vertices of the mesh...");
     RepairNonManifold(m_pMesh);
-    CutToDisk(m_pMesh);
+    Logger::Info("<RepairNonManifold> Completed!");
+
+    Logger::Info("Cutting the mesh...");
+    if (!CutToDisk(m_pMesh))
+    {
+        Logger::Error("Cannot cut the mesh into a topological disk.");
+        return false;
+    }
+    Logger::Info("<CutToDisk> Completed!");
+
     return true;
 }
 
@@ -306,7 +335,70 @@ void TextureOptimizer::RepairNonManifold(TriMesh * pMesh)
     Logger::Info("Non-manifold fixed, %u new vertices created!", newVertexNum);
 }
 
-void TextureOptimizer::CutToDisk(TriMesh * pMesh)
+bool TextureOptimizer::CutToDisk(TriMesh * pMesh)
 {
-    CutToDiskImpl(pMesh);
+    const size_t SEED_FACE_NUM = 100;
+    size_t faceIdxIncrement = pMesh->n_faces() / SEED_FACE_NUM;
+
+    std::vector<size_t> seedIdxs;
+    for (size_t seedIdx = 0; seedIdx < pMesh->n_faces(); seedIdx += faceIdxIncrement)
+    {
+        seedIdxs.push_back(seedIdx);
+    }
+
+    bmc::progress_bar progressBar(0, seedIdxs.size(), 80, false, true);
+    std::mutex mutex;
+
+    auto KernelFunc = [&seedIdxs, &pMesh, &mutex, &progressBar](tbb::blocked_range<size_t> & range, std::pair<size_t, size_t> value) -> std::pair<size_t, size_t>
+    {
+        for (size_t i = range.begin(); i != range.end(); i++)
+        {
+            mutex.lock();
+            progressBar++;
+            mutex.unlock();
+
+            TriMesh testMesh(*pMesh);
+            CutToDiskImpl(&testMesh, seedIdxs[i]);
+
+            auto boundaries = MeshBoundaryLengths(&testMesh);
+            if (boundaries.size() != 1) { continue; }
+
+            if (boundaries[0] < value.second)
+            {
+                value.first = seedIdxs[i];
+                value.second = boundaries[0];
+            }
+        }
+
+        return value;
+    };
+
+    auto ReduceFunc = [](std::pair<size_t, size_t> a, std::pair<size_t, size_t> b) -> std::pair<size_t, size_t>
+    {
+        return a.second < b.second ? a : b;
+    };
+
+    bool bStopped = false;
+    std::thread progressThread([](bmc::progress_bar & progress, bool & stopped)
+    {
+        while (!stopped)
+        {
+            std::cout << progress;
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        }
+    }, std::ref(progressBar), std::ref(bStopped));
+
+    tbb::blocked_range<size_t> range(0, seedIdxs.size());
+    auto result = tbb::parallel_reduce(range, std::make_pair(size_t(-1), std::numeric_limits<size_t>::max()), KernelFunc, ReduceFunc);
+    bStopped = true;
+    progressThread.join();
+    std::cout << progressBar << std::endl;
+
+    if (result.first == size_t(-1) || result.second == std::numeric_limits<size_t>::max())
+    {
+        return false;
+    }
+
+    CutToDiskImpl(pMesh, result.first);
+    return true;
 }

@@ -20,7 +20,7 @@ public:
 
     static void RemoveSmallComponent(TriMesh * pMesh);
     static void RepairNonManifold(TriMesh * pMesh);
-    static void CutToDisk(TriMesh * pMesh);
+    static bool CutToDisk(TriMesh * pMesh);
 
 private:
     TriMesh * m_pMesh;

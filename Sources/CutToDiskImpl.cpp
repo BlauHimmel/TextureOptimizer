@@ -130,6 +130,7 @@ static void CutMesh(TriMesh * pMesh, const std::vector<std::vector<int>> & cuts)
 #ifdef _DEBUG
             if (fvIter != fvIterEnd)
             {
+                Logger::Test("Non triangle facet found while cutting the mesh to disk.");
                 throw std::runtime_error("Non triangle facet found while cutting the mesh to disk.");
             }
 #endif
@@ -268,7 +269,7 @@ static void CutMesh(TriMesh * pMesh, const std::vector<std::vector<int>> & cuts)
     pMesh->release_vertex_status();
 }
 
-void CutToDiskImpl(TriMesh * pMesh)
+void CutToDiskImpl(TriMesh * pMesh, size_t seedIdx)
 {
     int faceNumber = static_cast<int>(pMesh->n_faces());
     int edgeNumber = static_cast<int>(pMesh->n_edges());
@@ -277,6 +278,12 @@ void CutToDiskImpl(TriMesh * pMesh)
     if (faceNumber == 0 || edgeNumber == 0 || vertexNumber == 0)
     {
         Logger::Warn("You tried to cut an empty mesh to disk, nothing happen.");
+        return;
+    }
+
+    if (seedIdx >= faceNumber)
+    {
+        Logger::Warn("Invalid index of seed face, nothing happen.");
         return;
     }
 
@@ -300,6 +307,7 @@ void CutToDiskImpl(TriMesh * pMesh)
 #ifdef _DEBUG
         if (fvIter != fvIterEnd)
         {
+            Logger::Test("Non triangle facet found while cutting the mesh to disk.");
             throw std::runtime_error("Non triangle facet found while cutting the mesh to disk.");
         }
 #endif
@@ -331,6 +339,7 @@ void CutToDiskImpl(TriMesh * pMesh)
 #ifdef _DEBUG
     if (edges.size() != edgeNumber)
     {
+        Logger::Test("Size of the map \"edges\" is not equal to the mesh's edge number.");
         throw std::runtime_error("Size of the map \"edges\" is not equal to the mesh's edge number.");
     }
 #endif
@@ -389,6 +398,7 @@ void CutToDiskImpl(TriMesh * pMesh)
 #ifdef _DEBUG
     if (edgeIdxs.size() != edgeNumber)
     {
+        Logger::Test("Size of the map \"edgeIdxs\" is not equal to the mesh's edge number.");
         throw std::runtime_error("Size of the map \"edgeIdxs\" is not equal to the mesh's edge number.");
     }
 
@@ -403,6 +413,7 @@ void CutToDiskImpl(TriMesh * pMesh)
 
         if (boundaryEdges.size() != boundaryEdgeNumber)
         {
+            Logger::Test("Size of the map \"boundaryEdges\" is not equal to the mesh's boundary edge number.");
             throw std::runtime_error("Size of the map \"boundaryEdges\" is not equal to the mesh's boundary edge number.");
         }
     }
@@ -414,17 +425,13 @@ void CutToDiskImpl(TriMesh * pMesh)
         deletedTags[i] = false;
     }
 
+    int floodingTimes = 0;
     std::set<int> deletedEdges/* Idx in 'edges' */;
-    /* Loop over all faces, flooding on the mesh */
-    for (int faceIdx = 0; faceIdx < faceNumber; faceIdx++)
-    {
-        /* Stop at first undeleted face */
-        if (deletedTags[faceIdx])
-        {
-            continue;
-        }
 
+    const auto FloodingFunc = [&deletedTags, &floodingTimes, &faceEdges, &boundaryEdges, &edgeFaces, &faceNumber, &deletedEdges](int faceIdx)
+    {
         deletedTags[faceIdx] = true;
+        floodingTimes++;
 
         std::deque<int> processEdges;
         for (int i = 0; i < 3; i++)
@@ -499,6 +506,26 @@ void CutToDiskImpl(TriMesh * pMesh)
                 }
             }
         }
+    };
+
+    /* Loop over the given seed face, flooding on the mesh */
+    FloodingFunc(static_cast<int>(seedIdx));
+
+    /* Loop over all other faces, flooding on the mesh */
+    for (int faceIdx = 0; faceIdx < faceNumber; faceIdx++)
+    {
+        /* Stop at first undeleted face */
+        if (deletedTags[faceIdx])
+        {
+            continue;
+        }
+
+        FloodingFunc(faceIdx);
+    }
+
+    if (floodingTimes != 1)
+    {
+        Logger::Test("Flooding times = %d. Ordinarily, this value should equal to 1.", floodingTimes);
     }
 
     /* Find the non-deleted edges */
