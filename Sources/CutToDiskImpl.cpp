@@ -251,9 +251,6 @@ static void CutMesh(TriMesh * pMesh, const std::vector<std::vector<int>> & cuts)
                     auto newToPoint = newMesh.point(newToVH);
                     auto originToPoint = pMesh->point(originToVH);
 
-                    auto newFromPoint = newMesh.point(newFromVH);
-                    auto originFromPoint = pMesh->point(originFromVH);
-
                     if (newToPoint == originToPoint)
                     {
                         const auto & texcoord = pMesh->texcoord2D(originHEH);
@@ -348,7 +345,7 @@ void CutToDiskImpl(TriMesh * pMesh)
     Eigen::MatrixXi faceEdges(faceNumber, 3);
     /* Index of the boundary edges in 'edges' */
     std::set<int> boundaryEdges;
-    /* Key is the indices of edge's endpoints in 'Facet', value is the indices of the edge in 'Edge'. */
+    /* Key is the indices of edge's endpoints in 'facet', value is the indices of the edge in 'edge'. */
     std::map<std::pair<int, int>, int> edgeIdxs;
 
     {

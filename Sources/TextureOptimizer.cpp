@@ -12,6 +12,7 @@ bool TextureOptimizer::Run()
         return false;
     }
 
+    RemoveSmallComponent(m_pMesh);
     RepairNonManifold(m_pMesh);
     CutToDisk(m_pMesh);
     return true;
@@ -146,9 +147,48 @@ size_t TextureOptimizer::MeshBoundaryCount(const TriMesh * pMesh)
     return MeshBoundaryLengths(pMesh).size();
 }
 
-void TextureOptimizer::RemoveSmallComponent(TriMesh *pMesh)
+void TextureOptimizer::RemoveSmallComponent(TriMesh * pMesh)
 {
+    auto componentVHs = MeshComponentVertices(pMesh);
 
+    Logger::Info("%zd unique components found!", componentVHs.size());
+    for (size_t i = 0; i < componentVHs.size(); i++)
+    {
+        Logger::Info("Component %zd: %zd vertices.", i, componentVHs[i].size());
+    }
+
+    if (componentVHs.size() <= 1) { return; }
+
+    size_t maxComponentIdx(-1);
+    size_t maxComponentVertexNum(0);
+    for (size_t i = 0; i < componentVHs.size(); i++)
+    {
+        if (componentVHs[i].size() > maxComponentVertexNum)
+        {
+            maxComponentVertexNum = componentVHs[i].size();
+            maxComponentIdx = i;
+        }
+    }
+
+    pMesh->request_face_status();
+    pMesh->request_edge_status();
+    pMesh->request_vertex_status();
+
+    for (size_t i = 0; i < componentVHs.size(); i++)
+    {
+        if (i == maxComponentIdx) { continue; }
+        for (auto componentVH : componentVHs[i])
+        {
+            pMesh->delete_vertex(componentVH);
+        }
+    }
+
+    pMesh->garbage_collection();
+    pMesh->release_face_status();
+    pMesh->release_edge_status();
+    pMesh->release_vertex_status();
+
+    Logger::Info("Component %zd (%zd vertices) was reserved, others were removed.", maxComponentIdx, maxComponentVertexNum);
 }
 
 void TextureOptimizer::RepairNonManifold(TriMesh * pMesh)
@@ -164,7 +204,7 @@ void TextureOptimizer::RepairNonManifold(TriMesh * pMesh)
         }
     }
 
-    Logger::Info("%zd non-manifold vertices founld!", nonManifoldVHs.size());
+    Logger::Info("%zd non-manifold vertices found!", nonManifoldVHs.size());
 
     if (nonManifoldVHs.empty()) { return; }
 
