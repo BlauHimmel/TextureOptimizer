@@ -12,6 +12,7 @@ public:
     static void Warn(const char * pFormatString, ...);
     static void Error(const char * pFormatString, ...);
     static void Test(const char * pFormatString, ...);
+    static std::string Format(const char * pFormatString, ...);
 };
 
 #endif //LOGGER_HPP

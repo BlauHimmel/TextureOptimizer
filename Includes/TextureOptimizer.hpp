@@ -22,6 +22,11 @@ public:
     static void RepairNonManifold(TriMesh * pMesh);
     static bool CutToDisk(TriMesh * pMesh);
 
+    static size_t GetMeshEuler(const TriMesh * pMesh);
+    static size_t GetMeshGenus(const TriMesh * pMesh);
+
+    static bool MeshUVTransfer(TriMesh * pMesh, const TriMesh * pUVMesh);
+
 private:
     TriMesh * m_pMesh;
     Texture * m_pTexture;

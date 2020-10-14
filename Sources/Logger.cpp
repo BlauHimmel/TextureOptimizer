@@ -132,3 +132,18 @@ void Logger::Test(const char *pFormatString, ...)
 #endif
 #endif
 }
+
+std::string Logger::Format(const char * pFormatString, ...)
+{
+    std::string str;
+    va_list args;
+    va_start(args, pFormatString);
+    {
+        int length = _vscprintf(pFormatString, args) + 1;
+        std::unique_ptr<char> chars(new char[length]);
+        _vsnprintf(chars.get(), length, pFormatString, args);
+        str.assign(chars.get());
+    }
+    va_end(args);
+    return str;
+}

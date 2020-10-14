@@ -10,21 +10,27 @@ ADD_DEFINITIONS(-D _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS)
 
 FIND_PACKAGE(OpenMesh REQUIRED NO_MODULE)
 FIND_PACKAGE(Eigen3 3.3 REQUIRED NO_MODULE)
-FIND_PACKAGE(TBB REQUIRED NO_MODULE)
+FIND_PACKAGE(TBB REQUIRED tbb NO_MODULE)
 
+SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/CMakes)
+FIND_PACKAGE(MKL REQUIRED)
+
+# make sure that the environments path are properly set.
 SET(EIGEN3_LIBRARIES Eigen3::Eigen)
 SET(OPENMESH_LIBRARIES OpenMeshCore OpenMeshTools)
-SET(TBB_LIBRARIES TBB::tbb)
+SET(TBB_LIBRARIES ${TBB_IMPORTED_TARGETS})
 SET(EXT_LIBRARIES
         ${EIGEN3_LIBRARIES}
         ${OPENMESH_LIBRARIES}
-        ${TBB_LIBRARIES})
+        ${TBB_LIBRARIES}
+        ${MKL_LIBRARIES})
 
 SET(PROJECT_INCLUDE_DIRS Includes)
 SET(EXT_INCLUDE_DIRS
         Libraries/Lyra/include
         Libraries/stb/include
-        Libraries/progress_bar/include)
+        Libraries/progress_bar/include
+        ${MKL_INCLUDE_DIR})
 SET(INCLUDE_DIRS
         ${PROJECT_INCLUDE_DIRS}
         ${EXT_INCLUDE_DIRS})
@@ -34,7 +40,8 @@ SET(SOURCE_FILES
         Sources/Texture.cpp
         Sources/TextureOptimizer.cpp
         Sources/Logger.cpp
-        Sources/CutToDiskImpl.cpp)
+        Sources/CutToDiskImpl.cpp
+        Sources/BarycentricParameterization.cpp)
 
 INCLUDE_DIRECTORIES(${INCLUDE_DIRS})
 ADD_EXECUTABLE(${PROJECT_NAME} ${SOURCE_FILES})

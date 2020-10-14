@@ -8,10 +8,11 @@
 
 #include <progress_bar.h>
 #include <tbb/parallel_reduce.h>
-#include <tbb/blocked_range.h>
+#include <tbb/parallel_for.h>
 
 #include "Logger.hpp"
 #include "CutToDiskImpl.hpp"
+#include "BarycentricParameterization.hpp"
 
 #ifdef max
 #undef max
@@ -37,12 +38,23 @@ bool TextureOptimizer::Run()
     Logger::Info("<RepairNonManifold> Completed!");
 
     Logger::Info("Cutting the mesh...");
-    if (!CutToDisk(m_pMesh))
+    if (!CutToDisk(m_pMesh) || GetMeshGenus(m_pMesh) != 0)
     {
         Logger::Error("Cannot cut the mesh into a topological disk.");
         return false;
     }
     Logger::Info("<CutToDisk> Completed!");
+
+    Logger::Info("Parameterizing the mesh...");
+    TriMesh uvMesh(*m_pMesh);
+    BarycentricMapping(uvMesh, EBoundary::Square, EBoundaryFixWeight::Length, ECoefficient::DiscreteHarmonic);
+
+    if (!MeshUVTransfer(m_pMesh, &uvMesh))
+    {
+        Logger::Error("Error occurred when parameterizing the mesh.");
+        return false;
+    }
+    Logger::Info("<MeshParameterization> Completed!");
 
     return true;
 }
@@ -400,5 +412,46 @@ bool TextureOptimizer::CutToDisk(TriMesh * pMesh)
     }
 
     CutToDiskImpl(pMesh, result.first);
+    return true;
+}
+
+size_t TextureOptimizer::GetMeshEuler(const TriMesh * pMesh)
+{
+    return pMesh->n_vertices() - pMesh->n_edges() + pMesh->n_faces();
+}
+
+size_t TextureOptimizer::GetMeshGenus(const TriMesh * pMesh)
+{
+    size_t euler = GetMeshEuler(pMesh);
+    return (2 - euler - MeshBoundaryCount(pMesh)) / 2;
+}
+
+bool TextureOptimizer::MeshUVTransfer(TriMesh * pMesh, const TriMesh * pUVMesh)
+{
+    /* Try best to ensure Mesh and UVMesh have the same topology. */
+    if (pMesh->n_vertices() != pUVMesh->n_vertices() ||
+        pMesh->n_edges() != pUVMesh->n_edges() ||
+        pMesh->n_faces() != pUVMesh->n_faces() ||
+        pMesh->n_halfedges() != pUVMesh->n_halfedges())
+    {
+        Logger::Error("When transfer UV, input Meshes must have same topology.");
+        return false;
+    }
+
+    auto KernelFunc = [&](tbb::blocked_range<size_t> & range)
+    {
+        for (size_t i = range.begin(); i < range.end(); i++)
+        {
+            const auto heh = TriMesh::HalfedgeHandle (int(i));
+            const auto vh = pUVMesh->to_vertex_handle(heh);
+            const auto & point = pUVMesh->point(vh);
+            TriMesh::TexCoord2D uv { point[0], point[1] };
+            pMesh->set_texcoord2D(heh, uv);
+        }
+    };
+
+    tbb::blocked_range<size_t> range(0, pMesh->n_halfedges());
+    tbb::parallel_for(range, KernelFunc);
+
     return true;
 }

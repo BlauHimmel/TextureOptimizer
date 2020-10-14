@@ -70,7 +70,9 @@ int main(int argc, const char ** argv)
     }
     Logger::Info("Successfully load mesh: \"%s\"!", meshFilename.c_str());
 
-    Logger::Info("Mesh info: %zd vertices, %zd faces, and %zd edges.", mesh.n_vertices(), mesh.n_faces(), mesh.n_edges());
+    Logger::Info("Mesh info: %zd vertices, %zd faces, and %zd edges, euler %zd, genus %zd.",
+                 mesh.n_vertices(), mesh.n_faces(), mesh.n_edges(), TextureOptimizer::GetMeshEuler(&mesh),
+                 TextureOptimizer::GetMeshGenus(&mesh));
 
     Logger::Info("Optimizing the texture...");
     TextureOptimizer textureOptimizer(&mesh, &texture);
