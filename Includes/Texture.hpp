@@ -9,6 +9,10 @@
 class Texture
 {
 public:
+    Texture() = default;
+    Texture(const Texture & other) = delete;
+    Texture(const Texture && other) = delete;
+
     bool Create(uint32_t width, uint32_t height, uint32_t channel);
     bool Load(const std::string & filename);
     bool Write(const std::string & filename);
@@ -17,6 +21,9 @@ public:
     uint8_t * At(uint32_t x, uint32_t y);
 
     bool IsValid() const;
+    uint32_t Width() const;
+    uint32_t Height() const;
+    uint32_t Channels() const;
 
     static std::unique_ptr<Texture> CreateChessBoard(uint32_t width, uint32_t height, uint32_t xCount, uint32_t yCount);
 

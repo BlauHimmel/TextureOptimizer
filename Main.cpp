@@ -12,11 +12,15 @@ int main(int argc, const char ** argv)
     bool bShowHelp = false;
     std::string meshFilename, textureFilename;
     std::string outputFilename;
+    uint32_t outputTextureWidth(-1);
+    uint32_t outputTextureHeight(-1);
 
     auto cli = lyra::help(bShowHelp)
         | lyra::opt(meshFilename, "mesh")["-m"]["--mesh"]("File name of the input mesh").required()
         | lyra::opt(textureFilename, "texture")["-t"]["--texture"]("File name of the input texture").required()
-        | lyra::opt(outputFilename, "output")["-o"]["--output"]("Directory of the output files.").required();
+        | lyra::opt(outputFilename, "output")["-o"]["--output"]("Directory of the output files.").required()
+        | lyra::opt(outputTextureWidth, "width")["-w"]["--width"]("Width of the output texture.").optional()
+        | lyra::opt(outputTextureHeight, "height")["-h"]["--height"]("Height of the output texture.").optional();
 
     auto result = cli.parse( {argc, argv} );
     if (!result)
@@ -76,7 +80,7 @@ int main(int argc, const char ** argv)
 
     Logger::Info("Optimizing the texture...");
     TextureOptimizer textureOptimizer(&mesh, &texture);
-    if (!textureOptimizer.Run())
+    if (!textureOptimizer.Run(outputTextureWidth, outputTextureHeight))
     {
         Logger::Error("Could not optimize the texture!");
         return 1;

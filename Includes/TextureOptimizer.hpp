@@ -8,7 +8,7 @@ class TextureOptimizer
 {
 public:
     TextureOptimizer(TriMesh * pMesh, Texture * pTexture) : m_pMesh(pMesh), m_pTexture(pTexture) { }
-    bool Run();
+    bool Run(uint32_t width, uint32_t height);
 
     static std::vector<std::vector<OpenMesh::VertexHandle>> MeshComponentVertices(const TriMesh * pMesh);
     static std::vector<size_t> MeshComponentVertexNums(const TriMesh * pMesh);
@@ -26,6 +26,8 @@ public:
     static size_t GetMeshGenus(const TriMesh * pMesh);
 
     static bool MeshUVTransfer(TriMesh * pMesh, const TriMesh * pUVMesh);
+
+    static bool TextureIntegrate(const TriMesh * pOriginMesh, const TriMesh * pNewMesh, Texture * pTexture, uint32_t width, uint32_t height);
 
 private:
     TriMesh * m_pMesh;

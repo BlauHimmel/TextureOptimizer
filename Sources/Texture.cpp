@@ -88,6 +88,21 @@ bool Texture::IsValid() const
     return m_bValid;
 }
 
+uint32_t Texture::Width() const
+{
+    return m_Width;
+}
+
+uint32_t Texture::Height() const
+{
+    return m_Height;
+}
+
+uint32_t Texture::Channels() const
+{
+    return m_Channels;
+}
+
 std::unique_ptr<Texture> Texture::CreateChessBoard(uint32_t width, uint32_t height, uint32_t xCount, uint32_t yCount)
 {
     if (width == 0 || height == 0 || xCount == 0 || yCount == 0)
