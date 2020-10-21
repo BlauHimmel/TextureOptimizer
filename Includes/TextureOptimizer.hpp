@@ -28,6 +28,7 @@ public:
     static bool MeshUVTransfer(TriMesh * pMesh, const TriMesh * pUVMesh);
 
     static bool TextureIntegrate(const TriMesh * pOriginMesh, const TriMesh * pNewMesh, Texture * pTexture, uint32_t width, uint32_t height);
+    static void SLIMProxy(TriMesh * pMesh);
 
 private:
     TriMesh * m_pMesh;

@@ -15,14 +15,18 @@ FIND_PACKAGE(TBB REQUIRED tbb NO_MODULE)
 SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/CMakes)
 FIND_PACKAGE(MKL REQUIRED)
 
-# make sure that the environments path are properly set.
+ADD_SUBDIRECTORY(Libraries/SLIM)
+
+# 'MKLDIR=.../IntelSWTools/compilers_and_libraries_xxxx/windows/mkl' should be set up in advance
 SET(EIGEN3_LIBRARIES Eigen3::Eigen)
 SET(OPENMESH_LIBRARIES OpenMeshCore OpenMeshTools)
 SET(TBB_LIBRARIES ${TBB_IMPORTED_TARGETS})
+SET(SLIM_LIBRARIES SLIM)
 SET(EXT_LIBRARIES
         ${EIGEN3_LIBRARIES}
         ${OPENMESH_LIBRARIES}
         ${TBB_LIBRARIES}
+        ${SLIM_LIBRARIES}
         ${MKL_LIBRARIES})
 
 SET(PROJECT_INCLUDE_DIRS Includes)
@@ -30,6 +34,8 @@ SET(EXT_INCLUDE_DIRS
         Libraries/Lyra/include
         Libraries/stb/include
         Libraries/progress_bar/include
+        Libraries/libigl/include
+        Libraries/SLIM/include
         ${MKL_INCLUDE_DIR})
 SET(INCLUDE_DIRS
         ${PROJECT_INCLUDE_DIRS}

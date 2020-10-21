@@ -7,6 +7,7 @@
 #include <chrono>
 
 #include <progress_bar.h>
+#include <SLIMWrapper.hpp>
 #include <tbb/parallel_reduce.h>
 #include <tbb/parallel_for.h>
 
@@ -49,7 +50,8 @@ bool TextureOptimizer::Run(uint32_t width, uint32_t height)
 
     Logger::Info("Parameterizing the mesh...");
     TriMesh uvMesh(*m_pMesh);
-    BarycentricMapping(uvMesh, EBoundary::Square, EBoundaryFixWeight::Length, ECoefficient::DiscreteHarmonic);
+    //BarycentricMapping(uvMesh, EBoundary::Square, EBoundaryFixWeight::Length, ECoefficient::DiscreteHarmonic);
+    SLIMProxy(&uvMesh);
     if (!MeshUVTransfer(m_pMesh, &uvMesh))
     {
         Logger::Error("Error occurred when parameterizing the mesh.");
@@ -669,4 +671,104 @@ bool TextureOptimizer::TextureIntegrate(const TriMesh * pOriginMesh, const TriMe
     }
 
     return true;
+}
+
+void TextureOptimizer::SLIMProxy(TriMesh * pMesh)
+{
+    int faceNumber = static_cast<int>(pMesh->n_faces());
+    int vertexNumber =  static_cast<int>(pMesh->n_vertices());
+
+    /* facet(i, j) : index of the j-th vertex at i-th triangle */
+    std::vector<std::vector<size_t>> facets(faceNumber, std::vector<size_t>(3));
+
+    for (int i = 0; i < faceNumber; i++)
+    {
+        const auto fh = TriMesh::FaceHandle(i);
+
+        auto fvIter = pMesh->fv_range(fh).begin();
+        auto fvIterEnd = pMesh->fv_range(fh).end();
+
+        const auto vh0 = *fvIter;
+        *fvIter++;
+        const auto vh1 = *fvIter;
+        *fvIter++;
+        const auto vh2 = *fvIter;
+        *fvIter++;
+
+        facets[i][0] = vh0.idx();
+        facets[i][1] = vh1.idx();
+        facets[i][2] = vh2.idx();
+    }
+
+    /* vertices(i, j) : value of the j-th component of position at i-th vertex */
+    std::vector<std::vector<double>> vertices(vertexNumber, std::vector<double>(3));
+
+    for (int i = 0; i < vertexNumber; i++)
+    {
+        const auto vh = TriMesh::VertexHandle (i);
+        const auto & point = pMesh->point(vh);
+
+        vertices[i][0] = point[0];
+        vertices[i][1] = point[1];
+        vertices[i][2] = point[2];
+    }
+
+    const int ITERATIONS = 20;
+
+    bmc::progress_bar progressBar(0, ITERATIONS, 80, false, true);
+
+    bool bStopped = false;
+    int currIterations = 0;
+    std::thread progressThread([](bmc::progress_bar & progress, bool & stopped, int & current)
+    {
+        while (!stopped)
+        {
+            progress.set(current);
+            std::cout << progress;
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        }
+    }, std::ref(progressBar), std::ref(bStopped), std::ref(currIterations));
+
+    auto uv = SLIM(vertices, facets, ITERATIONS, &currIterations);
+
+    bStopped = true;
+    progressThread.join();
+    progressBar.set(ITERATIONS);
+    std::cout << progressBar << std::endl;
+
+    for (int i = 0; i < vertexNumber; i++)
+    {
+        const auto vh = TriMesh::VertexHandle(i);
+        auto & point = pMesh->point(vh);
+        point[0] = uv[i][0];
+        point[1] = uv[i][1];
+    }
+
+    Real xMin =  std::numeric_limits<Real>::max();
+    Real yMin =  std::numeric_limits<Real>::max();
+    Real xMax = -std::numeric_limits<Real>::max();
+    Real yMax = -std::numeric_limits<Real>::max();
+
+    for (int i = 0; i < vertexNumber; i++)
+    {
+        const auto vh = TriMesh::VertexHandle (i);
+        const auto & point = pMesh->point(vh);
+
+        xMin = std::min(xMin, point[0]);
+        xMax = std::max(xMax, point[0]);
+
+        yMin = std::min(yMin, point[1]);
+        yMax = std::max(yMax, point[1]);
+    }
+
+    Real invDeltaX = 1.0 / (xMax - xMin);
+    Real invDeltaY = 1.0 / (yMax - yMin);
+
+    for (int i = 0; i < vertexNumber; i++)
+    {
+        const auto vh = TriMesh::VertexHandle (i);
+        auto & point = pMesh->point(vh);
+        point[0] = (point[0] - xMin) * invDeltaX;
+        point[1] = (point[1] - yMin) * invDeltaY;
+    }
 }

@@ -31,8 +31,6 @@ using Matrix3 = Eigen::Matrix<Real, 3, 3>;
 using Matrix4 = Eigen::Matrix<Real, 4, 4>;
 using MatrixX = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
 
-using SparseMatrix = Eigen::SparseMatrix<Real, Eigen::ColMajor>;
-
 using Index = Eigen::Index;
 using Size = std::ptrdiff_t;
 
