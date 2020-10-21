@@ -4,11 +4,17 @@
 #include "Declaration.hpp"
 #include "Texture.hpp"
 
+enum class EParameterization
+{
+    EBarycentric = 0,
+    ESLIM = 1
+};
+
 class TextureOptimizer
 {
 public:
     TextureOptimizer(TriMesh * pMesh, Texture * pTexture) : m_pMesh(pMesh), m_pTexture(pTexture) { }
-    bool Run(uint32_t width, uint32_t height);
+    bool Run(uint32_t width, uint32_t height, EParameterization parameterization);
 
     static std::vector<std::vector<OpenMesh::VertexHandle>> MeshComponentVertices(const TriMesh * pMesh);
     static std::vector<size_t> MeshComponentVertexNums(const TriMesh * pMesh);

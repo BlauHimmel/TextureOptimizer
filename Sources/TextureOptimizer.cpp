@@ -23,7 +23,7 @@
 #undef min
 #endif
 
-bool TextureOptimizer::Run(uint32_t width, uint32_t height)
+bool TextureOptimizer::Run(uint32_t width, uint32_t height, EParameterization parameterization)
 {
     if (m_pMesh == nullptr || m_pTexture == nullptr || !m_pTexture->IsValid())
     {
@@ -50,8 +50,21 @@ bool TextureOptimizer::Run(uint32_t width, uint32_t height)
 
     Logger::Info("Parameterizing the mesh...");
     TriMesh uvMesh(*m_pMesh);
-    //BarycentricMapping(uvMesh, EBoundary::Square, EBoundaryFixWeight::Length, ECoefficient::DiscreteHarmonic);
-    SLIMProxy(&uvMesh);
+
+    if (parameterization == EParameterization::EBarycentric)
+    {
+        BarycentricMapping(uvMesh, EBoundary::Square, EBoundaryFixWeight::Length, ECoefficient::DiscreteHarmonic);
+    }
+    else if (parameterization == EParameterization::ESLIM)
+    {
+        SLIMProxy(&uvMesh);
+    }
+    else
+    {
+        Logger::Error("Unkonwn parameterization method.");
+        return false;
+    }
+
     if (!MeshUVTransfer(m_pMesh, &uvMesh))
     {
         Logger::Error("Error occurred when parameterizing the mesh.");

@@ -14,11 +14,13 @@ int main(int argc, const char ** argv)
     std::string outputFilename;
     uint32_t outputTextureWidth(-1);
     uint32_t outputTextureHeight(-1);
+    uint32_t parameterizationMethod = 0;
 
     auto cli = lyra::help(bShowHelp)
         | lyra::opt(meshFilename, "mesh")["-m"]["--mesh"]("File name of the input mesh").required()
         | lyra::opt(textureFilename, "texture")["-t"]["--texture"]("File name of the input texture").required()
         | lyra::opt(outputFilename, "output")["-o"]["--output"]("Directory of the output files.").required()
+        | lyra::opt(parameterizationMethod, "parameterization")["-p"]["--param"]("Method used for parameterization: 0: Harmonic, 1: SLIM.").required().choices(0, 1)
         | lyra::opt(outputTextureWidth, "width")["-w"]["--width"]("Width of the output texture.").optional()
         | lyra::opt(outputTextureHeight, "height")["-h"]["--height"]("Height of the output texture.").optional();
 
@@ -80,7 +82,7 @@ int main(int argc, const char ** argv)
 
     Logger::Info("Optimizing the texture...");
     TextureOptimizer textureOptimizer(&mesh, &texture);
-    if (!textureOptimizer.Run(outputTextureWidth, outputTextureHeight))
+    if (!textureOptimizer.Run(outputTextureWidth, outputTextureHeight, EParameterization(parameterizationMethod)))
     {
         Logger::Error("Could not optimize the texture!");
         return 1;
