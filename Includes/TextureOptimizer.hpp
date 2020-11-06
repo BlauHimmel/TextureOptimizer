@@ -14,7 +14,7 @@ class TextureOptimizer
 {
 public:
     TextureOptimizer(TriMesh * pMesh, Texture * pTexture) : m_pMesh(pMesh), m_pTexture(pTexture) { }
-    bool Run(uint32_t width, uint32_t height, EParameterization parameterization);
+    bool Run(uint32_t width, uint32_t height, EParameterization parameterization, TriMesh * pCutMesh = nullptr);
 
     static std::vector<std::vector<OpenMesh::VertexHandle>> MeshComponentVertices(const TriMesh * pMesh);
     static std::vector<size_t> MeshComponentVertexNums(const TriMesh * pMesh);
@@ -22,6 +22,7 @@ public:
 
     static std::vector<std::vector<OpenMesh::VertexHandle>> MeshBoundaryVertices(const TriMesh * pMesh);
     static std::vector<size_t> MeshBoundaryLengths(const TriMesh * pMesh);
+    static std::vector<Real> MeshBoundaryDistances(const TriMesh * pMesh);
     static size_t MeshBoundaryCount(const TriMesh * pMesh);
 
     static void RemoveSmallComponent(TriMesh * pMesh);

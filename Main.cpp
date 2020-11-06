@@ -9,6 +9,8 @@
 
 int main(int argc, const char ** argv)
 {
+    /* ************************ parse and check args ************************ */
+
     bool bShowHelp = false;
     std::string meshFilename, textureFilename;
     std::string outputFilename;
@@ -48,7 +50,12 @@ int main(int argc, const char ** argv)
     std::filesystem::path texturePath(textureFilename);
 
     std::string meshOutput = outputFilename + meshPath.stem().string() + ".opt" + meshPath.extension().string();
+    std::string cutMeshPath = outputFilename + meshPath.stem().string() + ".cut" + meshPath.extension().string();
     std::string textureOutput = outputFilename + texturePath.stem().string() + ".opt" + texturePath.extension().string();
+
+    /* ************************ parse and check args ************************ */
+
+    /* ************************ load texture ************************ */
 
     /* load texture from file */
     Texture texture;
@@ -60,6 +67,10 @@ int main(int argc, const char ** argv)
         return 1;
     }
     Logger::Info("Successfully load texture: \"%s\"!", textureFilename.c_str());
+
+    /* ************************ load texture ************************ */
+
+    /* ************************ load mesh ************************ */
 
     /* load mesh from file */
     TriMesh mesh;
@@ -80,16 +91,24 @@ int main(int argc, const char ** argv)
                  mesh.n_vertices(), mesh.n_faces(), mesh.n_edges(), TextureOptimizer::GetMeshEuler(&mesh),
                  TextureOptimizer::GetMeshGenus(&mesh));
 
+    /* ************************ load mesh ************************ */
+
+    /* ************************ run optimizer ************************ */
+
     Logger::Info("Optimizing the texture...");
+    TriMesh cutMesh;
     TextureOptimizer textureOptimizer(&mesh, &texture);
-    if (!textureOptimizer.Run(outputTextureWidth, outputTextureHeight, EParameterization(parameterizationMethod)))
+    if (!textureOptimizer.Run(outputTextureWidth, outputTextureHeight, EParameterization(parameterizationMethod), &cutMesh))
     {
         Logger::Error("Could not optimize the texture!");
         return 1;
     }
     Logger::Info("Successfully optimize the texture!");
 
-    /* write texture */
+    /* ************************ run optimizer ************************ */
+
+    /* ************************ write texture ************************ */
+
     Logger::Info("Writing texture...");
     if (!texture.Write(textureOutput))
     {
@@ -98,17 +117,30 @@ int main(int argc, const char ** argv)
     }
     Logger::Info("Successfully write texture: \"%s\"!", textureOutput.c_str());
 
-    /* write mesh */
+    /* ************************ write texture ************************ */
+
+    /* ************************ write mesh ************************ */
+
     OpenMesh::IO::Options wOpts;
     wOpts += OpenMesh::IO::Options::FaceTexCoord;
 
     Logger::Info("Writing mesh...");
+
     if (!OpenMesh::IO::write_mesh(mesh, meshOutput, wOpts))
     {
         Logger::Error("Could not write mesh: \"%s\"!", meshOutput.c_str());
         return 1;
     }
     Logger::Info("Successfully write mesh: \"%s\"!", meshOutput.c_str());
+
+    if (!OpenMesh::IO::write_mesh(cutMesh, cutMeshPath, wOpts))
+    {
+        Logger::Error("Could not write mesh: \"%s\"!", cutMeshPath.c_str());
+        return 1;
+    }
+    Logger::Info("Successfully write mesh: \"%s\"!", cutMeshPath.c_str());
+
+    /* ************************ write mesh ************************ */
 
     return 0;
 }

@@ -23,7 +23,7 @@
 #undef min
 #endif
 
-bool TextureOptimizer::Run(uint32_t width, uint32_t height, EParameterization parameterization)
+bool TextureOptimizer::Run(uint32_t width, uint32_t height, EParameterization parameterization, TriMesh * pCutMesh)
 {
     if (m_pMesh == nullptr || m_pTexture == nullptr || !m_pTexture->IsValid())
     {
@@ -47,6 +47,10 @@ bool TextureOptimizer::Run(uint32_t width, uint32_t height, EParameterization pa
     Logger::Info("<CutToDisk> Completed!");
 
     TriMesh originMesh(*m_pMesh);
+    if (pCutMesh != nullptr)
+    {
+        *pCutMesh = originMesh;
+    }
 
     Logger::Info("Parameterizing the mesh...");
     TriMesh uvMesh(*m_pMesh);
@@ -207,6 +211,25 @@ std::vector<size_t> TextureOptimizer::MeshBoundaryLengths(const TriMesh * pMesh)
     return boundaryLengths;
 }
 
+std::vector<Real> TextureOptimizer::MeshBoundaryDistances(const TriMesh * pMesh)
+{
+    auto boundaryVertices = MeshBoundaryVertices(pMesh);
+    std::vector<Real> boundaryDistances;
+    boundaryDistances.reserve(boundaryVertices.size());
+    for (const auto & boundary : boundaryVertices)
+    {
+        Real distance = 0.0;
+        for (size_t i = 0; i < boundary.size(); i++)
+        {
+            const auto & v0 = pMesh->point(boundary[i]);
+            const auto & v1 = pMesh->point(boundary[(i + 1) % boundary.size()]);
+            distance += (v1 - v0).norm();
+        }
+        boundaryDistances.push_back(distance);
+    }
+    return boundaryDistances;
+}
+
 size_t TextureOptimizer::MeshBoundaryCount(const TriMesh * pMesh)
 {
     return MeshBoundaryLengths(pMesh).size();
@@ -277,6 +300,9 @@ void TextureOptimizer::RepairNonManifold(TriMesh * pMesh)
 
     OpenMesh::FPropHandleT<size_t> componentFProp;
     pMesh->add_property(componentFProp);
+    pMesh->request_face_status();
+    pMesh->request_edge_status();
+    pMesh->request_vertex_status();
 
     for (auto vh : pMesh->vertices())
     {
@@ -366,8 +392,12 @@ void TextureOptimizer::RepairNonManifold(TriMesh * pMesh)
         }
     }
 
-    pMesh->remove_property(componentFProp);
     pMesh->garbage_collection();
+    pMesh->remove_property(componentFProp);
+    pMesh->release_face_status();
+    pMesh->release_edge_status();
+    pMesh->release_vertex_status();
+
     Logger::Info("Non-manifold fixed, %u new vertices created!", newVertexNum);
 }
 
@@ -385,7 +415,7 @@ bool TextureOptimizer::CutToDisk(TriMesh * pMesh)
     bmc::progress_bar progressBar(0, seedIdxs.size(), 80, false, true);
     std::mutex mutex;
 
-    auto KernelFunc = [&seedIdxs, &pMesh, &mutex, &progressBar](tbb::blocked_range<size_t> & range, std::pair<size_t, size_t> value) -> std::pair<size_t, size_t>
+    auto KernelFunc = [&seedIdxs, &pMesh, &mutex, &progressBar](tbb::blocked_range<size_t> & range, std::pair<size_t, Real> value) -> std::pair<size_t, Real>
     {
         for (size_t i = range.begin(); i != range.end(); i++)
         {
@@ -396,20 +426,20 @@ bool TextureOptimizer::CutToDisk(TriMesh * pMesh)
             TriMesh testMesh(*pMesh);
             CutToDiskImpl(&testMesh, seedIdxs[i]);
 
-            auto boundaries = MeshBoundaryLengths(&testMesh);
-            if (boundaries.size() != 1) { continue; }
+            auto boundaryDistances = MeshBoundaryDistances(&testMesh);
+            if (boundaryDistances.size() != 1) { continue; }
 
-            if (boundaries[0] < value.second)
+            if (boundaryDistances[0] < value.second)
             {
                 value.first = seedIdxs[i];
-                value.second = boundaries[0];
+                value.second = boundaryDistances[0];
             }
         }
 
         return value;
     };
 
-    auto ReduceFunc = [](std::pair<size_t, size_t> a, std::pair<size_t, size_t> b) -> std::pair<size_t, size_t>
+    auto ReduceFunc = [](std::pair<size_t, Real> a, std::pair<size_t, Real> b) -> std::pair<size_t, Real>
     {
         return a.second < b.second ? a : b;
     };
@@ -425,12 +455,12 @@ bool TextureOptimizer::CutToDisk(TriMesh * pMesh)
     }, std::ref(progressBar), std::ref(bStopped));
 
     tbb::blocked_range<size_t> range(0, seedIdxs.size());
-    auto result = tbb::parallel_reduce(range, std::make_pair(size_t(-1), std::numeric_limits<size_t>::max()), KernelFunc, ReduceFunc);
+    auto result = tbb::parallel_reduce(range, std::make_pair(size_t(-1), std::numeric_limits<Real>::max()), KernelFunc, ReduceFunc);
     bStopped = true;
     progressThread.join();
     std::cout << progressBar << std::endl;
 
-    if (result.first == size_t(-1) || result.second == std::numeric_limits<size_t>::max())
+    if (result.first == size_t(-1) || result.second == std::numeric_limits<Real>::max())
     {
         return false;
     }
