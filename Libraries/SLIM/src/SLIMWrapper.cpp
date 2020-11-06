@@ -6,14 +6,6 @@
 #include "GlobalLocalParametrization.h"
 #include "StateManager.h"
 
-#ifdef max
-#undef max
-#endif
-
-#ifdef min
-#undef min
-#endif
-
 std::vector<std::vector<double>> SLIM(std::vector<std::vector<double>> & vertices, std::vector<std::vector<size_t>> & facets, int iterations, int * pCurrIterations)
 {
     Param_State state;

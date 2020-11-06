@@ -1,4 +1,4 @@
-#pragma warning(disable:4244 4018 4819 4305 4267 4715 4996 4267)
+#pragma warning(disable:4244 4018 4819 4305 4267 4715 4996)
 
 #include "StateManager.h"
 

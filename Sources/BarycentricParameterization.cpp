@@ -3,8 +3,8 @@
 #include <functional>
 #include <mkl.h>
 
-#include "TextureOptimizer.hpp"
 #include "Logger.hpp"
+#include "MeshUtils.hpp"
 
 using namespace BarycentricInternal;
 
@@ -25,7 +25,7 @@ namespace BarycentricInternal
             }
         }
 
-        auto boundaries = TextureOptimizer::MeshBoundaryVertices(&mesh);
+        auto boundaries = MeshBoundaryVertices(&mesh);
         if (boundaries.size() != 1)
         {
             Logger::Error("Barycentric parameterization can only run on single boundary mesh.");
