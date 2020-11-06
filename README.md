@@ -7,7 +7,7 @@
 https://github.com/oneapi-src/oneTBB/releases
 - Copy all files into the cmake installed directory (e.g. at C:/Program Files/)
 
-### OpenMesh and Eigen
+### OpenMesh, Eigen and GLFW3
 
 - Download source codes from the official website.
 - Complie them using CMake.
