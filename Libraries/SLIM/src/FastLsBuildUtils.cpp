@@ -8,7 +8,9 @@
 #include "igl/vertex_triangle_adjacency.h"
 #include "igl/unique_rows.h"
 
-#include "tbb/tbb.h"
+#include "tbb/blocked_range.h"
+#include "tbb/partitioner.h"
+#include "tbb/parallel_for.h"
 
 using namespace std;
 

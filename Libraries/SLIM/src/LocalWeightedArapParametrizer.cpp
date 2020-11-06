@@ -16,7 +16,9 @@
 #include <Eigen/Sparse>
 #include <Eigen/SparseQR>
 
-#include "tbb/tbb.h"
+#include "tbb/blocked_range.h"
+#include "tbb/partitioner.h"
+#include "tbb/parallel_for.h"
 
 
 LocalWeightedArapParametrizer::LocalWeightedArapParametrizer(Param_State* state, bool remeshing) :
