@@ -5,10 +5,7 @@
 #include <memory>
 
 #include "Logger.hpp"
-
-#ifdef _DEBUG
-#include "TextureOptimizer.hpp"
-#endif
+#include "MeshUtils.hpp"
 
 /* Cut the mesh use 'cuts'. */
 static void CutMesh(TriMesh * pMesh, const std::vector<std::vector<int>> & cuts)
@@ -403,7 +400,7 @@ void CutToDiskImpl(TriMesh * pMesh, size_t seedIdx)
     }
 
     {
-        const auto boundaries = TextureOptimizer::MeshBoundaryVertices(pMesh);
+        const auto boundaries = MeshBoundaryVertices(pMesh);
         size_t boundaryEdgeNumber = 0;
         for (const auto boundary : boundaries)
         {

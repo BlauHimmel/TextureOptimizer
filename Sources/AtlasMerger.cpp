@@ -1,13 +1,10 @@
-#pragma warning(disable:4244 4018 4305 4819 4267 4005)
 #include "AtlasMerger.hpp"
 
 #include <unordered_set>
 #include <queue>
 #include <random>
 
-#include <igl/opengl/glfw/Viewer.h>
-
-#include "Logger.hpp"
+#include "IglDebugViewer.hpp"
 
 struct TexCoord2DHasher
 {
@@ -17,20 +14,25 @@ struct TexCoord2DHasher
     }
 };
 
-size_t AtlasMerger::MarkAtlasIndex(TriMesh * pMesh)
+std::unique_ptr<AtlasInfo> AtlasMerger::MarkAtlasIndex(TriMesh * pMesh)
 {
+    if (pMesh == nullptr) { return nullptr; }
+
+    const std::string MESH_FPROP_ATLAS_INDEX = "atlasIdx";
+
     OpenMesh::FPropHandleT<size_t> atlasIdxFProp;
-    pMesh->add_property(atlasIdxFProp, "atlasIdx");
+    pMesh->add_property(atlasIdxFProp, MESH_FPROP_ATLAS_INDEX);
 
     for (auto fh : pMesh->faces())
     {
         pMesh->property(atlasIdxFProp, fh) = size_t(-1);
     }
 
-    size_t atlasIdx = 0;
+    std::unique_ptr<AtlasInfo> atlasInfo(new AtlasInfo);
 
     while (true)
     {
+        /* find an unhandled face as a seed face */
         int seedFaceIdx = -1;
         for (auto fh : pMesh->faces())
         {
@@ -41,10 +43,8 @@ size_t AtlasMerger::MarkAtlasIndex(TriMesh * pMesh)
             }
         }
 
-        if (seedFaceIdx == -1)
-        {
-            break;
-        }
+        /* all faces have been handled, break */
+        if (seedFaceIdx == -1) { break; }
 
         std::queue<OpenMesh::FaceHandle> faceQueue;
         std::unordered_set<TriMesh::TexCoord2D, TexCoord2DHasher> atlasUVSet;
@@ -64,11 +64,13 @@ size_t AtlasMerger::MarkAtlasIndex(TriMesh * pMesh)
             auto fh = faceQueue.front();
             faceQueue.pop();
 
+            /* check whether current face has been handled before (since it might be the adjacent face (xyz domain) of several face) */
             if (pMesh->property(atlasIdxFProp, fh) != size_t(-1))
             {
                 continue;
             }
 
+            /* check whether is face is isolated (uv domain) */
             int existUVCount = 0;
             for (auto heh : pMesh->fh_range(fh))
             {
@@ -79,18 +81,34 @@ size_t AtlasMerger::MarkAtlasIndex(TriMesh * pMesh)
                 }
             }
 
-            if (existUVCount <= 1)
+            if (existUVCount <= 1) { continue; }
+
+            /* update face property & atlas info */
+            size_t atlasIdx = atlasInfo->atlasNum;
+            pMesh->property(atlasIdxFProp, fh) = atlasIdx;
+
+            atlasInfo->atlasFaces[atlasIdx].insert(fh.idx());
+            for (auto vh : pMesh->fv_range(fh))
             {
-                continue;
+                atlasInfo->atlasVertices[atlasIdx].insert(vh.idx());
+            }
+            for (auto eh : pMesh->fe_range(fh))
+            {
+                atlasInfo->atlasEdges[atlasIdx].insert(eh.idx());
+            }
+            for (auto heh : pMesh->fh_range(fh))
+            {
+                atlasInfo->atlasHalfedges[atlasIdx].insert(heh.idx());
             }
 
-            pMesh->property(atlasIdxFProp, fh) = atlasIdx;
+            /* store the uv coordinate of current face */
             for (auto heh : pMesh->fh_range(fh))
             {
                 const auto & uv = pMesh->texcoord2D(heh);
                 atlasUVSet.insert(uv);
             }
 
+            /* insert the adjacent faces (xyz domain) that have not been handled before into the queue */
             for (auto adjFH : pMesh->ff_range(fh))
             {
                 if (pMesh->property(atlasIdxFProp, adjFH) == size_t(-1))
@@ -100,67 +118,24 @@ size_t AtlasMerger::MarkAtlasIndex(TriMesh * pMesh)
             }
         }
 
-        atlasIdx++;
+        atlasInfo->atlasNum++;
     }
 
-    DisplayAtlas(pMesh, atlasIdx);
+    /* visualization used for debug */
+    DisplayAtlas(pMesh, atlasInfo->atlasNum, MESH_FPROP_ATLAS_INDEX);
 
-    return atlasIdx;
+    return atlasInfo;
 }
 
-void AtlasMerger::DisplayAtlas(TriMesh * pMesh, size_t atlasNum)
+
+size_t AtlasMerger::MergeAtlas(TriMesh * pMesh, AtlasInfo * pAtlasInfo)
 {
-    OpenMesh::FPropHandleT<size_t> atlasIdxFProp;
-    if (!pMesh->get_property_handle(atlasIdxFProp, "atlasIdx"))
+    if (pMesh == nullptr || pAtlasInfo == nullptr)
     {
-        Logger::Error("To display atlas, mesh must have face property \"atlasIdx\".");
-        return;
+        return size_t(-1);
     }
 
-    std::default_random_engine engine(pMesh->n_vertices());
-    std::uniform_real_distribution<double> uniform(0.0, 1.0);
-    std::vector<std::vector<double>> randColors;
-    for (size_t i = 0; i < atlasNum; i++)
-    {
-        randColors.push_back({ uniform(engine), uniform(engine), uniform(engine) });
-    }
 
-    Eigen::MatrixXd V;
-    Eigen::MatrixXd C;
-    Eigen::MatrixXi F;
 
-    V.resize(pMesh->n_vertices(), 3);
-    for (auto vh : pMesh->vertices())
-    {
-        V(vh.idx(), 0) = pMesh->point(vh)[0];
-        V(vh.idx(), 1) = pMesh->point(vh)[1];
-        V(vh.idx(), 2) = pMesh->point(vh)[2];
-    }
-
-    F.resize(pMesh->n_faces(), 3);
-    C.resize(pMesh->n_faces(), 3);
-    for (auto fh : pMesh->faces())
-    {
-        auto fvIter = pMesh->fv_range(fh).begin();
-        const auto vh0 = *fvIter;
-        *fvIter++;
-        const auto vh1 = *fvIter;
-        *fvIter++;
-        const auto vh2 = *fvIter;
-        *fvIter++;
-
-        F(fh.idx(), 0) = vh0.idx();
-        F(fh.idx(), 1) = vh1.idx();
-        F(fh.idx(), 2) = vh2.idx();
-
-        C(fh.idx(), 0) =  randColors[pMesh->property(atlasIdxFProp, fh)][0];
-        C(fh.idx(), 1) =  randColors[pMesh->property(atlasIdxFProp, fh)][1];
-        C(fh.idx(), 2) =  randColors[pMesh->property(atlasIdxFProp, fh)][2];
-    }
-
-    igl::opengl::glfw::Viewer viewer;
-    viewer.data().set_mesh(V, F);
-    viewer.data().set_colors(C);
-    viewer.launch();
-
+    return 0;
 }

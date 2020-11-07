@@ -4,6 +4,14 @@ PROJECT(TextureOptimizer)
 SET(CMAKE_CXX_STANDARD 17)
 SET(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# handle error when compiling IglDebugViewer.cpp in debug mode using msvc
+# fatal error C1128: number of sections exceeded object file format limit: compile with /bigobj
+IF (WIN32)
+    IF (CMAKE_BUILD_TYPE MATCHES "Debug")
+        SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /bigobj")
+    ENDIF()
+ENDIF()
+
 ADD_DEFINITIONS(-D _USE_MATH_DEFINES)
 ADD_DEFINITIONS(-D _CRT_SECURE_NO_WARNINGS)
 ADD_DEFINITIONS(-D _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS)
@@ -57,7 +65,8 @@ SET(SOURCE_FILES
         Sources/CutToDiskImpl.cpp
         Sources/BarycentricParameterization.cpp
         Sources/AtlasMerger.cpp
-        Sources/MeshUtils.cpp)
+        Sources/MeshUtils.cpp
+        Sources/IglDebugViewer.cpp)
 
 INCLUDE_DIRECTORIES(${INCLUDE_DIRS})
 ADD_EXECUTABLE(${PROJECT_NAME} ${SOURCE_FILES})
