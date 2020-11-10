@@ -198,15 +198,9 @@ size_t AtlasMerger::MergeAtlas(TriMesh * pMesh, AtlasInfo * pAtlasInfo)
         /* compute handle number of each atlas and record disk-like atlas */
         for (size_t atlasIdx : atlasIdxSet)
         {
-            size_t vertexNum = pAtlasInfo->atlasVertices[atlasIdx].size();
-            size_t edgeNum = pAtlasInfo->atlasEdges[atlasIdx].size();
-            size_t faceNum = pAtlasInfo->atlasFaces[atlasIdx].size();
-            int32_t euler = static_cast<int32_t>(vertexNum) - static_cast<int32_t>(edgeNum) + static_cast<int32_t>(faceNum);
-            int32_t boundaryCount = 1;
-            int32_t genus = (2 - euler - boundaryCount) / 2;
-
-            if (genus == 0)
+            if (GetAtlasGenus(pAtlasInfo, atlasIdx) == 0)
             {
+                size_t faceNum = pAtlasInfo->atlasFaces[atlasIdx].size();
                 atlasSizes.emplace_back(atlasIdx, faceNum);
             }
         }
@@ -215,11 +209,7 @@ size_t AtlasMerger::MergeAtlas(TriMesh * pMesh, AtlasInfo * pAtlasInfo)
         if (atlasSizes.empty()) { break; }
 
         /* sort all disk-like atlas according the face number */
-        std::sort(atlasSizes.begin(), atlasSizes.end(),
-        [](const std::pair<size_t, size_t> &lhs, std::pair<size_t, size_t> &rhs)
-        {
-            return lhs.second < rhs.second;
-        });
+        SortAtlasSize(atlasSizes);
 
         size_t mergedFaceNum = 0;
 
@@ -239,16 +229,7 @@ size_t AtlasMerger::MergeAtlas(TriMesh * pMesh, AtlasInfo * pAtlasInfo)
                 std::set<int> & atlasEdges1 = pAtlasInfo->atlasEdges[mergedAtlasIdx1];
 
                 /* if two atlas contains same edges, them it can be merged tother */
-                size_t intersectLength = 0;
-                for (int edge0 : atlasEdges0)
-                {
-                    if (atlasEdges1.count(edge0) > 0)
-                    {
-                        intersectLength++;
-                    }
-                }
-
-                if (intersectLength <= MERGE_STAGE_1_CONNECT_THRESHOLD) { continue; }
+                if (IntersectNum(atlasEdges0, atlasEdges1) <= MERGE_STAGE_1_CONNECT_THRESHOLD) { continue; }
 
                 /* update atlas info and mesh property */
                 MergeAtlasInfoAndFProperty(pAtlasInfo, pMesh, atlasIdxFProp, mergedAtlasIdx1, mergedAtlasIdx0);
@@ -276,14 +257,8 @@ size_t AtlasMerger::MergeAtlas(TriMesh * pMesh, AtlasInfo * pAtlasInfo)
         /* compute handle number of each atlas and record disk-like atlas */
         for (size_t atlasIdx : atlasIdxSet)
         {
-            size_t vertexNum = pAtlasInfo->atlasVertices[atlasIdx].size();
-            size_t edgeNum = pAtlasInfo->atlasEdges[atlasIdx].size();
             size_t faceNum = pAtlasInfo->atlasFaces[atlasIdx].size();
-            int32_t euler = static_cast<int32_t>(vertexNum) - static_cast<int32_t>(edgeNum) + static_cast<int32_t>(faceNum);
-            int32_t boundaryCount = 1;
-            int32_t genus = (2 - euler - boundaryCount) / 2;
-
-            if (genus == 0)
+            if (GetAtlasGenus(pAtlasInfo, atlasIdx) == 0)
             {
                 diskAtlasSizes.emplace_back(atlasIdx, faceNum);
             }
@@ -297,17 +272,8 @@ size_t AtlasMerger::MergeAtlas(TriMesh * pMesh, AtlasInfo * pAtlasInfo)
         if (diskAtlasSizes.empty()) { break; }
 
         /* sort all disk-like and non-disk-like atlas according the face number */
-        std::sort(diskAtlasSizes.begin(), diskAtlasSizes.end(),
-        [](const std::pair<size_t, size_t> & lhs, std::pair<size_t, size_t> & rhs)
-        {
-            return lhs.second < rhs.second;
-        });
-
-        std::sort(nonDiskAtlasSizes.begin(), nonDiskAtlasSizes.end(),
-        [](const std::pair<size_t, size_t> & lhs, std::pair<size_t, size_t> & rhs)
-        {
-            return lhs.second < rhs.second;
-        });
+        SortAtlasSize(diskAtlasSizes);
+        SortAtlasSize(nonDiskAtlasSizes);
 
         size_t mergedFaceNum = 0;
 
@@ -325,16 +291,7 @@ size_t AtlasMerger::MergeAtlas(TriMesh * pMesh, AtlasInfo * pAtlasInfo)
                 std::set<int> & atlasEdges1 = pAtlasInfo->atlasEdges[mergedAtlasIdx1];
 
                 /* if two atlas contains same edges, them it can be merged tother */
-                size_t intersectLength = 0;
-                for (int edge0 : atlasEdges0)
-                {
-                    if (atlasEdges1.count(edge0) > 0)
-                    {
-                        intersectLength++;
-                    }
-                }
-
-                if (intersectLength <= MERGE_STAGE_2_CONNECT_THRESHOLD) { continue; }
+                if (IntersectNum(atlasEdges0, atlasEdges1) <= MERGE_STAGE_2_CONNECT_THRESHOLD) { continue; }
 
                 /* update atlas info and mesh property */
                 MergeAtlasInfoAndFProperty(pAtlasInfo, pMesh, atlasIdxFProp, mergedAtlasIdx1, mergedAtlasIdx0);
@@ -369,11 +326,7 @@ size_t AtlasMerger::MergeAtlas(TriMesh * pMesh, AtlasInfo * pAtlasInfo)
         if (atlasSizes.empty()) { break; }
 
         /* sort all atlas according the face number */
-        std::sort(atlasSizes.begin(), atlasSizes.end(),
-        [](const std::pair<size_t, size_t> & lhs, std::pair<size_t, size_t> & rhs)
-        {
-            return lhs.second < rhs.second;
-        });
+        SortAtlasSize(atlasSizes);
 
         size_t mergedFaceNum = 0;
 
@@ -393,17 +346,7 @@ size_t AtlasMerger::MergeAtlas(TriMesh * pMesh, AtlasInfo * pAtlasInfo)
                 std::set<int> & atlasEdges1 = pAtlasInfo->atlasEdges[mergedAtlasIdx1];
 
                 /* if two atlas contains same edges, them it can be merged tother */
-                bool bConnected = false;
-                for (int edge0 : atlasEdges0)
-                {
-                    if (atlasEdges1.count(edge0) > 0)
-                    {
-                        bConnected = true;
-                        break;
-                    }
-                }
-
-                if (!bConnected) { continue; }
+                if (!IsIntersect(atlasEdges0, atlasEdges1)) { continue; }
 
                 /* update atlas info and mesh property */
                 MergeAtlasInfoAndFProperty(pAtlasInfo, pMesh, atlasIdxFProp, mergedAtlasIdx1, mergedAtlasIdx0);
@@ -466,17 +409,8 @@ size_t AtlasMerger::MergeAtlas(TriMesh * pMesh, AtlasInfo * pAtlasInfo)
             if (atlasSizes.empty()) { break; }
 
             /* sort all atlas according the face number */
-            std::sort(smallAtlasSizes.begin(), smallAtlasSizes.end(),
-            [](const std::pair<size_t, size_t> & lhs, std::pair<size_t, size_t> & rhs)
-            {
-                return lhs.second < rhs.second;
-            });
-
-            std::sort(atlasSizes.begin(), atlasSizes.end(),
-            [](const std::pair<size_t, size_t> & lhs, std::pair<size_t, size_t> & rhs)
-            {
-                return lhs.second < rhs.second;
-            });
+            SortAtlasSize(smallAtlasSizes);
+            SortAtlasSize(atlasSizes);
 
             size_t mergedFaceNum = 0;
 
@@ -496,17 +430,7 @@ size_t AtlasMerger::MergeAtlas(TriMesh * pMesh, AtlasInfo * pAtlasInfo)
                     std::set<int> & atlasEdges1 = pAtlasInfo->atlasEdges[mergedAtlasIdx1];
 
                     /* if two atlas contains same edges, them it can be merged tother */
-                    bool bConnected = false;
-                    for (int edge0 : atlasEdges0)
-                    {
-                        if (atlasEdges1.count(edge0) > 0)
-                        {
-                            bConnected = true;
-                            break;
-                        }
-                    }
-
-                    if (!bConnected) { continue; }
+                    if (!IsIntersect(atlasEdges0, atlasEdges1)) { continue; }
 
                     /* update atlas info and mesh property */
                     MergeAtlasInfoAndFProperty(pAtlasInfo, pMesh, atlasIdxFProp, mergedAtlasIdx1, mergedAtlasIdx0);
@@ -538,6 +462,11 @@ size_t AtlasMerger::MergeAtlas(TriMesh * pMesh, AtlasInfo * pAtlasInfo)
     DisplayAtlas(pMesh, pAtlasInfo->atlasNum, MESH_FPROP_ATLAS_INDEX, "Atlas - After Merge");
 
     return pAtlasInfo->atlasNum;
+}
+
+std::unique_ptr<TriMesh[]> AtlasMerger::AtlasOptimize(TriMesh * pMesh, AtlasInfo * pAtlasInfo)
+{
+    return nullptr;
 }
 
 void AtlasMerger::MergeAtlasInfoAndFProperty(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, size_t source, size_t target)
@@ -622,4 +551,51 @@ void AtlasMerger::RemapAtlasInfoKey(AtlasInfo * pAtlasInfo, TriMesh * pMesh, Ope
         newAtlasHalfedges[newAtlasIdx] = std::move(kv.second);
     }
     pAtlasInfo->atlasHalfedges = std::move(newAtlasHalfedges);
+}
+
+size_t AtlasMerger::IntersectNum(const std::set<int> & edges0, const std::set<int> & edges1)
+{
+    size_t intersectLength = 0;
+    for (int edge0 : edges0)
+    {
+        if (edges1.count(edge0) > 0)
+        {
+            intersectLength++;
+        }
+    }
+    return intersectLength;
+}
+
+bool AtlasMerger::IsIntersect(const std::set<int> & edges0, const std::set<int> & edges1)
+{
+    bool bConnected = false;
+    for (int edge0 : edges0)
+    {
+        if (edges1.count(edge0) > 0)
+        {
+            bConnected = true;
+            break;
+        }
+    }
+    return bConnected;
+}
+
+void AtlasMerger::SortAtlasSize(std::vector<std::pair<size_t, size_t>> & atlasSizes)
+{
+    std::sort(atlasSizes.begin(), atlasSizes.end(),
+    [](const std::pair<size_t, size_t> & lhs, std::pair<size_t, size_t> & rhs)
+    {
+        return lhs.second < rhs.second;
+    });
+}
+
+int32_t AtlasMerger::GetAtlasGenus(AtlasInfo * pAtlasInfo, size_t atlasIdx)
+{
+    size_t vertexNum = pAtlasInfo->atlasVertices[atlasIdx].size();
+    size_t edgeNum = pAtlasInfo->atlasEdges[atlasIdx].size();
+    size_t faceNum = pAtlasInfo->atlasFaces[atlasIdx].size();
+    int32_t euler = static_cast<int32_t>(vertexNum) - static_cast<int32_t>(edgeNum) + static_cast<int32_t>(faceNum);
+    int32_t boundaryCount = 1;
+    int32_t genus = (2 - euler - boundaryCount) / 2;
+    return genus;
 }

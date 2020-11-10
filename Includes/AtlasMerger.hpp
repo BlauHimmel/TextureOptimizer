@@ -24,10 +24,15 @@ public:
 
     static std::unique_ptr<AtlasInfo> MarkAtlasIndex(TriMesh * pMesh);
     static size_t MergeAtlas(TriMesh * pMesh, AtlasInfo * pAtlasInfo);
+    static std::unique_ptr<TriMesh[]> AtlasOptimize(TriMesh * pMesh, AtlasInfo * pAtlasInfo);
 
 private:
     static void MergeAtlasInfoAndFProperty(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, size_t source, size_t target);
     static void RemapAtlasInfoKey(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, const std::set<size_t> & atlasIdxSet);
+    static size_t IntersectNum(const std::set<int> & edges0, const std::set<int> & edges1);
+    static bool IsIntersect(const std::set<int> & edges0, const std::set<int> & edges1);
+    static void SortAtlasSize(std::vector<std::pair<size_t, size_t>/*<atlasIdx, faceNum>*/> & atlasSizes);
+    static int32_t GetAtlasGenus(AtlasInfo * pAtlasInfo, size_t atlasIdx);
 
 private:
     TriMesh * m_pMesh;
