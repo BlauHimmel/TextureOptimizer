@@ -16,8 +16,8 @@ void RemoveSmallComponent(TriMesh * pMesh);
 void RepairNonManifold(TriMesh * pMesh);
 bool CutToDisk(TriMesh * pMesh);
 
-size_t GetMeshEuler(const TriMesh * pMesh);
-size_t GetMeshGenus(const TriMesh * pMesh);
+int32_t GetMeshEuler(const TriMesh * pMesh);
+int32_t GetMeshGenus(const TriMesh * pMesh);
 
 bool MeshUVTransfer(TriMesh * pMesh, const TriMesh * pUVMesh);
 

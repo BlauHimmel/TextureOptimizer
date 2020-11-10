@@ -391,15 +391,15 @@ bool CutToDisk(TriMesh * pMesh)
     return true;
 }
 
-size_t GetMeshEuler(const TriMesh * pMesh)
+int32_t GetMeshEuler(const TriMesh * pMesh)
 {
-    return pMesh->n_vertices() - pMesh->n_edges() + pMesh->n_faces();
+    return static_cast<int32_t>(pMesh->n_vertices()) - static_cast<int32_t>(pMesh->n_edges()) + static_cast<int32_t>(pMesh->n_faces());
 }
 
-size_t GetMeshGenus(const TriMesh * pMesh)
+int32_t GetMeshGenus(const TriMesh * pMesh)
 {
-    size_t euler = GetMeshEuler(pMesh);
-    return (2 - euler - MeshBoundaryCount(pMesh)) / 2;
+    int32_t euler = GetMeshEuler(pMesh);
+    return (2 - euler - static_cast<int32_t>(MeshBoundaryCount(pMesh))) / 2;
 }
 
 bool MeshUVTransfer(TriMesh * pMesh, const TriMesh * pUVMesh)

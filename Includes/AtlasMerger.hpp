@@ -20,9 +20,14 @@ class AtlasMerger
 {
 public:
     explicit AtlasMerger(TriMesh * pMesh) : m_pMesh(pMesh) { }
+    bool Run();
 
     static std::unique_ptr<AtlasInfo> MarkAtlasIndex(TriMesh * pMesh);
     static size_t MergeAtlas(TriMesh * pMesh, AtlasInfo * pAtlasInfo);
+
+private:
+    static void MergeAtlasInfoAndFProperty(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, size_t source, size_t target);
+    static void RemapAtlasInfoKey(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, const std::set<size_t> & atlasIdxSet);
 
 private:
     TriMesh * m_pMesh;

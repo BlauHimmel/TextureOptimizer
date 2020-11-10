@@ -43,7 +43,7 @@ double LinesearchParametrizer::line_search(const Eigen::MatrixXd& V, const Eigen
     uv = linesearch_uv;
     new_energy = linesearch_e;
   } else {
-    cout << "Error: linesearch cannot progress anymore" << endl;
+    //cout << "Error: linesearch cannot progress anymore" << endl;
   }
   return new_energy;
 }

@@ -58,7 +58,6 @@ SET(EXT_SOURCE_FILES
         Libraries/glad/src/glad.c)
 SET(SOURCE_FILES
         ${EXT_SOURCE_FILES}
-        Main.cpp
         Sources/Texture.cpp
         Sources/TextureOptimizer.cpp
         Sources/Logger.cpp
@@ -69,5 +68,9 @@ SET(SOURCE_FILES
         Sources/IglDebugViewer.cpp)
 
 INCLUDE_DIRECTORIES(${INCLUDE_DIRS})
-ADD_EXECUTABLE(${PROJECT_NAME} ${SOURCE_FILES})
-TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${EXT_LIBRARIES})
+
+ADD_EXECUTABLE(TextureOptimizer MainTextureOptimizer.cpp ${SOURCE_FILES})
+TARGET_LINK_LIBRARIES(TextureOptimizer ${EXT_LIBRARIES})
+
+ADD_EXECUTABLE(TextureOptimizerV2 MainTextureOptimizerV2.cpp ${SOURCE_FILES})
+TARGET_LINK_LIBRARIES(TextureOptimizerV2 ${EXT_LIBRARIES})

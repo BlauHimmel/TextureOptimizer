@@ -3,6 +3,6 @@
 
 #include "Declaration.hpp"
 
-void DisplayAtlas(TriMesh * pMesh, size_t atlasNum, const std::string & atlasIdxFPropName);
+void DisplayAtlas(TriMesh * pMesh, size_t atlasNum, const std::string & atlasIdxFPropName, const std::string & title);
 
 #endif //IGL_DEBUG_VIEWER_HPP

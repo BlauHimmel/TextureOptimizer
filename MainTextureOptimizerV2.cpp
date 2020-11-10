@@ -89,25 +89,16 @@ int main(int argc, const char ** argv)
     }
     Logger::Info("Successfully load mesh: \"%s\"!", meshFilename.c_str());
 
-    Logger::Info("Mesh info: %zd vertices, %zd faces, and %zd edges, euler %zd, genus %zd.",
-                 mesh.n_vertices(), mesh.n_faces(), mesh.n_edges(), GetMeshEuler(&mesh),
-                 GetMeshGenus(&mesh));
+    Logger::Info("Mesh info: %zd vertices, %zd faces, and %zd edges, euler %d, genus %d.",
+                 mesh.n_vertices(), mesh.n_faces(), mesh.n_edges(), GetMeshEuler(&mesh), GetMeshGenus(&mesh));
 
     /* ************************ load mesh ************************ */
-
-    //////////////////////
-
-    AtlasMerger::MarkAtlasIndex(&mesh);
-    return 0;
-
-    /////////////////////
 
     /* ************************ run optimizer ************************ */
 
     Logger::Info("Optimizing the texture...");
-    TriMesh cutMesh;
-    TextureOptimizer textureOptimizer(&mesh, &texture);
-    if (!textureOptimizer.Run(outputTextureWidth, outputTextureHeight, EParameterization(parameterizationMethod), &cutMesh))
+    AtlasMerger atlasMerger(&mesh);
+    if (!atlasMerger.Run())
     {
         Logger::Error("Could not optimize the texture!");
         return 1;
@@ -115,41 +106,6 @@ int main(int argc, const char ** argv)
     Logger::Info("Successfully optimize the texture!");
 
     /* ************************ run optimizer ************************ */
-
-    /* ************************ write texture ************************ */
-
-    Logger::Info("Writing texture...");
-    if (!texture.Write(textureOutput))
-    {
-        Logger::Error("Could not write texture: \"%s\"!", textureOutput.c_str());
-        return 1;
-    }
-    Logger::Info("Successfully write texture: \"%s\"!", textureOutput.c_str());
-
-    /* ************************ write texture ************************ */
-
-    /* ************************ write mesh ************************ */
-
-    OpenMesh::IO::Options wOpts;
-    wOpts += OpenMesh::IO::Options::FaceTexCoord;
-
-    Logger::Info("Writing mesh...");
-
-    if (!OpenMesh::IO::write_mesh(mesh, meshOutput, wOpts))
-    {
-        Logger::Error("Could not write mesh: \"%s\"!", meshOutput.c_str());
-        return 1;
-    }
-    Logger::Info("Successfully write mesh: \"%s\"!", meshOutput.c_str());
-
-    if (!OpenMesh::IO::write_mesh(cutMesh, cutMeshPath, wOpts))
-    {
-        Logger::Error("Could not write mesh: \"%s\"!", cutMeshPath.c_str());
-        return 1;
-    }
-    Logger::Info("Successfully write mesh: \"%s\"!", cutMeshPath.c_str());
-
-    /* ************************ write mesh ************************ */
 
     return 0;
 }

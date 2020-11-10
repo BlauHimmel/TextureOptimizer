@@ -7,7 +7,7 @@
 
 #include "Logger.hpp"
 
-void DisplayAtlas(TriMesh * pMesh, size_t atlasNum, const std::string & atlasIdxFPropName)
+void DisplayAtlas(TriMesh * pMesh, size_t atlasNum, const std::string & atlasIdxFPropName, const std::string & title)
 {
     OpenMesh::FPropHandleT<size_t> atlasIdxFProp;
     if (!pMesh->get_property_handle(atlasIdxFProp, atlasIdxFPropName))
@@ -16,11 +16,18 @@ void DisplayAtlas(TriMesh * pMesh, size_t atlasNum, const std::string & atlasIdx
         return;
     }
 
-    std::default_random_engine engine(pMesh->n_vertices());
+    std::default_random_engine engine(pMesh->n_vertices() + atlasNum);
     std::uniform_real_distribution<double> uniform(0.0, 1.0);
     std::vector<std::vector<double>> randColors;
+    randColors.reserve(atlasNum);
     for (size_t i = 0; i < atlasNum; i++)
     {
+        std::vector<double> color = { uniform(engine), uniform(engine), uniform(engine) };
+        /* avoid dark color */
+        while ((color[0] + color[1] + color[3]) / 3.0 < 0.1)
+        {
+            color = { uniform(engine), uniform(engine), uniform(engine) };
+        }
         randColors.push_back({ uniform(engine), uniform(engine), uniform(engine) });
     }
 
@@ -52,13 +59,24 @@ void DisplayAtlas(TriMesh * pMesh, size_t atlasNum, const std::string & atlasIdx
         F(fh.idx(), 1) = vh1.idx();
         F(fh.idx(), 2) = vh2.idx();
 
-        C(fh.idx(), 0) =  randColors[pMesh->property(atlasIdxFProp, fh)][0];
-        C(fh.idx(), 1) =  randColors[pMesh->property(atlasIdxFProp, fh)][1];
-        C(fh.idx(), 2) =  randColors[pMesh->property(atlasIdxFProp, fh)][2];
+        size_t atlasIdx = pMesh->property(atlasIdxFProp, fh);
+
+        if (atlasIdx != size_t(-1))
+        {
+            C(fh.idx(), 0) =  randColors[atlasIdx][0];
+            C(fh.idx(), 1) =  randColors[atlasIdx][1];
+            C(fh.idx(), 2) =  randColors[atlasIdx][2];
+        }
+        else
+        {
+            C(fh.idx(), 0) =  0.0;
+            C(fh.idx(), 1) =  0.0;
+            C(fh.idx(), 2) =  0.0;
+        }
     }
 
     igl::opengl::glfw::Viewer viewer;
     viewer.data().set_mesh(V, F);
     viewer.data().set_colors(C);
-    viewer.launch();
+    viewer.launch(true, false, title);
 }
