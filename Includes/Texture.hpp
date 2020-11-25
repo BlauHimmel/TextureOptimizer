@@ -17,6 +17,8 @@ public:
     bool Load(const std::string & filename);
     bool Write(const std::string & filename);
 
+    std::unique_ptr<Texture> Copy() const;
+
     uint8_t & At(uint32_t x, uint32_t y, uint32_t channels);
     uint8_t * At(uint32_t x, uint32_t y);
 

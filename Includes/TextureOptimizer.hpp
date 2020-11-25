@@ -3,12 +3,7 @@
 
 #include "Declaration.hpp"
 #include "Texture.hpp"
-
-enum class EParameterization
-{
-    EBarycentric = 0,
-    ESLIM = 1
-};
+#include "MeshUtils.hpp"
 
 class TextureOptimizer
 {
@@ -17,7 +12,6 @@ public:
     bool Run(uint32_t width, uint32_t height, EParameterization parameterization, TriMesh * pCutMesh = nullptr);
 
     static bool TextureIntegrate(const TriMesh * pOriginMesh, const TriMesh * pNewMesh, Texture * pTexture, uint32_t width, uint32_t height);
-    static void SLIMProxy(TriMesh * pMesh);
 
 private:
     TriMesh * m_pMesh;

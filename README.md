@@ -17,8 +17,4 @@ https://github.com/oneapi-src/oneTBB/releases
 
 - Download intel's MKL package from the official website.
 - Run the installer of intel's MKL.
-- Set environment variable 'MKLDIR=<where you install MKL>/IntelSWTools/compilers_and_libraries_xxxx/windows/mkl''
-
-### CGAL, QT and BOOST
-
-- Download and install accorrding to the official doc.
+- Set environment variable 'MKLDIR=<where you install MKL>/IntelSWTools/compilers_and_libraries_xxxx/windows/mkl'

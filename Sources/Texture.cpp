@@ -73,6 +73,18 @@ bool Texture::Write(const std::string & filename)
     return false;
 }
 
+std::unique_ptr<Texture> Texture::Copy() const
+{
+    std::unique_ptr<Texture> texture(new Texture);
+    texture->m_bValid = m_bValid;
+    texture->m_Channels = m_Channels;
+    texture->m_Width = m_Width;
+    texture->m_Height = m_Height;
+    texture->m_Data.reset(new uint8_t[m_Width * m_Height * m_Channels]);
+    memcpy(texture->m_Data.get(), m_Data.get(), sizeof(uint8_t) * m_Width * m_Height * m_Channels);
+    return texture;
+}
+
 uint8_t & Texture::At(uint32_t x, uint32_t y, uint32_t channels)
 {
     return *Fetch(this, x, y, channels);

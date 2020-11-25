@@ -24,7 +24,7 @@ int main(int argc, const char ** argv)
         | lyra::opt(meshFilename, "mesh")["-m"]["--mesh"]("File name of the input mesh").required()
         | lyra::opt(textureFilename, "texture")["-t"]["--texture"]("File name of the input texture").required()
         | lyra::opt(outputFilename, "output")["-o"]["--output"]("Directory of the output files.").required()
-        | lyra::opt(parameterizationMethod, "parameterization")["-p"]["--param"]("Method used for parameterization: 0: Harmonic, 1: SLIM.").required().choices(0, 1)
+        | lyra::opt(parameterizationMethod, "parameterization")["-p"]["--param"]("Method used for parameterization: 0: Harmonic, 1: SLIM, 2: EBP.").required().choices(0, 1, 2)
         | lyra::opt(outputTextureWidth, "width")["-w"]["--width"]("Width of the output texture.").optional()
         | lyra::opt(outputTextureHeight, "height")["-h"]["--height"]("Height of the output texture.").optional();
 
@@ -52,7 +52,6 @@ int main(int argc, const char ** argv)
     std::filesystem::path texturePath(textureFilename);
 
     std::string meshOutput = outputFilename + meshPath.stem().string() + ".opt" + meshPath.extension().string();
-    std::string cutMeshPath = outputFilename + meshPath.stem().string() + ".cut" + meshPath.extension().string();
     std::string textureOutput = outputFilename + texturePath.stem().string() + ".opt" + texturePath.extension().string();
 
     /* ************************ parse and check args ************************ */
@@ -97,8 +96,8 @@ int main(int argc, const char ** argv)
     /* ************************ run optimizer ************************ */
 
     Logger::Info("Optimizing the texture...");
-    AtlasMerger atlasMerger(&mesh);
-    if (!atlasMerger.Run())
+    AtlasMerger atlasMerger(&mesh, &texture);
+    if (!atlasMerger.Run(outputTextureWidth, outputTextureHeight, EParameterization(parameterizationMethod), meshOutput, textureOutput))
     {
         Logger::Error("Could not optimize the texture!");
         return 1;
