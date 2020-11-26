@@ -4,8 +4,9 @@
 #include <igl/edge_topology.h>
 
 #include <queue>
+#include <utility>
 
-DualNodeType::DualNodeType(int facet, const Eigen::Matrix3d & A, const Eigen::Vector3d &b, double c) : A(A), b(b), c(c)
+DualNodeType::DualNodeType(int facet, Eigen::Matrix3d A, const Eigen::Vector3d & b, double c) : A(std::move(A)), b(b), c(c)
 {
     faces = std::unordered_set<int>();
     faces.insert(facet);
@@ -25,7 +26,7 @@ DualNodeType DualNodeType::operator+(const DualNodeType & rhs) const
     return res;
 }
 
-std::vector<std::vector<int>> ClusteringAlgorithm::Cluster(TriMesh * pMesh, double threshold)
+std::vector<std::vector<int>> ClusteringAlgorithm::Cluster(TriMesh * pMesh, size_t clusterNum)
 {
     Eigen::MatrixXd V;
     Eigen::MatrixXi F;
@@ -92,8 +93,9 @@ std::vector<std::vector<int>> ClusteringAlgorithm::Cluster(TriMesh * pMesh, doub
 
     while (!pq.empty())
     {
-        double cost = -pq.top().first;
-        if (cost > threshold) { break; }
+        // double cost = -pq.top().first;
+        // if (cost > threshold) { break; }
+        if (valid.size() <= clusterNum) { break; }
         auto p = dualEdges[pq.top().second];
         pq.pop();
         int ndID0 = p.first, ndID1 = p.second;
@@ -150,7 +152,7 @@ std::vector<std::vector<int>> ClusteringAlgorithm::Cluster(TriMesh * pMesh, doub
     return res;
 }
 
-void ClusteringAlgorithm::GetDualEdges(const Eigen::MatrixXd & V, const Eigen::MatrixXi & F, std::vector<std::pair<int, int>> & dualEdges) const
+void ClusteringAlgorithm::GetDualEdges(const Eigen::MatrixXd & V, const Eigen::MatrixXi & F, std::vector<std::pair<int, int>> & dualEdges)
 {
     Eigen::MatrixXi EV, FE, EF;
     igl::edge_topology(V, F, EV, FE, EF);
@@ -164,7 +166,7 @@ void ClusteringAlgorithm::GetDualEdges(const Eigen::MatrixXd & V, const Eigen::M
     }
 }
 
-double ClusteringAlgorithm::EvaluateCost(const DualNodeType & dn1, const DualNodeType & dn2) const
+double ClusteringAlgorithm::EvaluateCost(const DualNodeType & dn1, const DualNodeType & dn2)
 {
     Eigen::Matrix3d A = dn1.A + dn2.A;
     Eigen::Vector3d b = dn1.b + dn2.b;

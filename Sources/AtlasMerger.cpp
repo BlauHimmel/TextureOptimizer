@@ -580,7 +580,7 @@ size_t AtlasMerger::MergeAtlas(TriMesh * pMesh, AtlasInfo * pAtlasInfo)
 std::unique_ptr<AtlasInfo> AtlasMerger::MeshClustering(TriMesh * pMesh)
 {
     ClusteringAlgorithm cluster;
-    std::vector<std::vector<int>> clusters = cluster.Cluster(pMesh, 1.65);
+    std::vector<std::vector<int>> clusters = cluster.Cluster(pMesh, 16);
 
     OpenMesh::FPropHandleT<size_t> atlasIdxFProp;
     pMesh->add_property(atlasIdxFProp, MESH_FPROP_ATLAS_INDEX);

@@ -13,7 +13,7 @@ struct DualNodeType
     double c = 0.0;
 
     DualNodeType() = default;
-    DualNodeType(int facet, const Eigen::Matrix3d & A, const Eigen::Vector3d & b, double c);
+    DualNodeType(int facet, Eigen::Matrix3d A, const Eigen::Vector3d & b, double c);
     DualNodeType operator+(const DualNodeType & rhs) const;
 };
 
@@ -21,11 +21,11 @@ struct DualNodeType
 class ClusteringAlgorithm
 {
 public:
-    std::vector<std::vector<int>> Cluster(TriMesh * pMesh, double threshold = 2e-2);
+    static std::vector<std::vector<int>> Cluster(TriMesh * pMesh, size_t clusterNum = 9);
 
 private:
-    void GetDualEdges(const Eigen::MatrixXd & V, const Eigen::MatrixXi & F, std::vector<std::pair<int, int>> & dualEdges) const;
-    double EvaluateCost(const DualNodeType & dn1, const DualNodeType & dn2) const;
+    static void GetDualEdges(const Eigen::MatrixXd & V, const Eigen::MatrixXi & F, std::vector<std::pair<int, int>> & dualEdges);
+    static double EvaluateCost(const DualNodeType & dn1, const DualNodeType & dn2);
 };
 
 #endif //CLUSTERING_ALGORITHM_HPP
