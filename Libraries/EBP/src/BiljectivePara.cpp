@@ -110,7 +110,7 @@ double BiljectivePara::adjust_weight(double conv_mesh, double last_mesh_energy)
 void BiljectivePara::load()
 {
 	is_initialization = true;
-	cout << " EBP begin ..." << endl;
+	cout << "EBP begin ..." << endl;
 
 	int v_num = mesh.n_vertices();
 	int f_num = mesh.n_faces();

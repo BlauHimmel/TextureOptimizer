@@ -25,8 +25,8 @@ int main(int argc, const char ** argv)
         | lyra::opt(textureFilename, "texture")["-t"]["--texture"]("File name of the input texture").required()
         | lyra::opt(outputFilename, "output")["-o"]["--output"]("Directory of the output files.").required()
         | lyra::opt(parameterizationMethod, "parameterization")["-p"]["--param"]("Method used for parameterization: 0: Harmonic, 1: SLIM, 2: EBP.").required().choices(0, 1, 2)
-        | lyra::opt(outputTextureWidth, "width")["-w"]["--width"]("Width of the output texture.").optional()
-        | lyra::opt(outputTextureHeight, "height")["-h"]["--height"]("Height of the output texture.").optional();
+        | lyra::opt(outputTextureWidth, "width")["-x"]["--width"]("Width of the output texture.").optional()
+        | lyra::opt(outputTextureHeight, "height")["-y"]["--height"]("Height of the output texture.").optional();
 
     auto result = cli.parse( {argc, argv} );
     if (!result)

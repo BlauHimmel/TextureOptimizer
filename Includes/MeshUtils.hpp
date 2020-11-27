@@ -2,6 +2,7 @@
 #define MESH_UTILS_HPP
 
 #include "Declaration.hpp"
+#include "Texture.hpp"
 
 enum class EParameterization
 {
@@ -30,5 +31,8 @@ bool MeshUVTransfer(TriMesh * pMesh, const TriMesh * pUVMesh);
 
 void SLIMProxy(TriMesh * pMesh);
 void EBPProxy(TriMesh * pMesh);
+
+bool TextureIntegrate(const TriMesh * pOriginMesh, const TriMesh * pNewMesh, Texture * pTexture, uint32_t width, uint32_t height);
+
 
 #endif //MESH_UTILS_HPP

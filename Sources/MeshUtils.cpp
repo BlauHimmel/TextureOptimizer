@@ -613,3 +613,224 @@ void EBPProxy(TriMesh * pMesh)
         point[1] = (point[1] - yMin) * invDeltaY;
     }
 }
+
+bool TextureIntegrate(const TriMesh * pOriginMesh, const TriMesh * pNewMesh, Texture * pTexture, uint32_t width, uint32_t height)
+{
+    if (pOriginMesh->n_vertices() != pNewMesh->n_vertices() ||
+        pOriginMesh->n_edges() != pNewMesh->n_edges() ||
+        pOriginMesh->n_faces() != pNewMesh->n_faces() ||
+        pOriginMesh->n_halfedges() != pNewMesh->n_halfedges())
+    {
+        Logger::Error("When integrate texture, input meshes must have same topology.");
+        return false;
+    }
+
+    uint32_t targetWidth = (width == uint32_t(-1) ? pTexture->Width() : width);
+    uint32_t targetHeight = (height == uint32_t(-1) ? pTexture->Height() : height);
+    uint32_t targetChannels = pTexture->Channels();
+
+    Texture integratedTexture;
+    integratedTexture.Create(targetWidth, targetHeight, targetChannels);
+
+    /* AABB of triangle v0, v1, v2 in image, v* should be texcoord in [0, 1]^2 */
+    auto GetTriangleAABBInImageFunc = [](const Vector2 & v0, const Vector2 & v1, const Vector2 & v2, uint32_t width,
+        uint32_t height) -> std::tuple<uint32_t, uint32_t, uint32_t, uint32_t> /* AABB[xMin, yMin, xMax, yMax] */
+    {
+        Real xMin =  std::numeric_limits<Real>::max();
+        Real yMin =  std::numeric_limits<Real>::max();
+        Real xMax = -std::numeric_limits<Real>::max();
+        Real yMax = -std::numeric_limits<Real>::max();
+
+        xMin = std::min(xMin, v0[0]); xMax = std::max(xMax, v0[0]);
+        xMin = std::min(xMin, v1[0]); xMax = std::max(xMax, v1[0]);
+        xMin = std::min(xMin, v2[0]); xMax = std::max(xMax, v2[0]);
+
+        yMin = std::min(yMin, v0[1]); yMax = std::max(yMax, v0[1]);
+        yMin = std::min(yMin, v1[1]); yMax = std::max(yMax, v1[1]);
+        yMin = std::min(yMin, v2[1]); yMax = std::max(yMax, v2[1]);
+
+        uint32_t widthLimit = width - 1;
+        uint32_t heightLimit = height - 1;
+
+        auto xMinInt = static_cast<uint32_t>(std::floor(xMin * widthLimit));
+        auto yMinInt = static_cast<uint32_t>(std::floor(yMin * heightLimit));
+        auto xMaxInt = static_cast<uint32_t>(std::ceil(xMax * widthLimit));
+        auto yMaxInt = static_cast<uint32_t>(std::ceil(yMax * heightLimit));
+
+        xMinInt = std::clamp(xMinInt, 0u, widthLimit);
+        yMinInt = std::clamp(yMinInt, 0u, heightLimit);
+        xMaxInt = std::clamp(xMaxInt, 0u, widthLimit);
+        yMaxInt = std::clamp(yMaxInt, 0u, heightLimit);
+
+        return std::make_tuple<>(xMinInt, yMinInt, xMaxInt, yMaxInt);
+    };
+
+    /* Whether v is inside triangle v0, v1, v2 */
+    auto IsInsideTriangleFunc = [](const Vector2 & v, const Vector2 & v0, const Vector2 & v1, const Vector2 & v2) -> bool
+    {
+        Real signOfTriangle = (v1[0] - v0[0]) * (v2[1] - v0[1]) - (v1[1] - v0[1]) * (v2[0] - v0[0]);
+        Real signOfAB = (v1[0] - v0[0]) * (v[1] - v0[1]) - (v1[1] - v0[1]) * (v[0] - v0[0]);
+        Real signOfCA = (v0[0] - v2[0]) * (v[1] - v2[1]) - (v0[1] - v2[1]) * (v[0] - v2[0]);
+        Real signOfBC = (v2[0] - v1[0]) * (v[1] - v2[1]) - (v2[1] - v1[1]) * (v[0] - v2[0]);
+
+        bool d1 = (signOfAB * signOfTriangle >= 0);
+        bool d2 = (signOfCA * signOfTriangle >= 0);
+        bool d3 = (signOfBC * signOfTriangle >= 0);
+
+        return d1 && d2 && d3;
+    };
+
+    /* affine matrix from triangle va0, va1, va2 to triangle vb0, vb1, vb2 */
+    auto GetTransformFunc = [](const Vector2 & va0, const Vector2 & va1, const Vector2 & va2,
+        const Vector2 & vb0, const Vector2 & vb1, const Vector2 & vb2) -> Matrix3
+    {
+        Matrix3 A;
+        A(0, 0) = va0[0]; A(0, 1) = va0[1]; A(0, 2) = 1;
+        A(1, 0) = va1[0]; A(1, 1) = va1[1]; A(1, 2) = 1;
+        A(2, 0) = va2[0]; A(2, 1) = va2[1]; A(2, 2) = 1;
+
+        Matrix3 B;
+        B(0, 0) = vb0[0]; B(0, 1) = vb0[1]; B(0, 2) = 1;
+        B(1, 0) = vb1[0]; B(1, 1) = vb1[1]; B(1, 2) = 1;
+        B(2, 0) = vb2[0]; B(2, 1) = vb2[1]; B(2, 2) = 1;
+
+        /* Ax=B */
+        return A.inverse() * B;
+    };
+
+    /* apply affine matrix t (by left multiply) to v */
+    auto ApplyTransformFunc = [](const Vector2 & v, const Matrix3 & t) -> Vector2
+    {
+        Eigen::Matrix<Real, 1, 3> vec(v[0], v[1], 1);
+        vec *= t;
+        return Vector2(vec[0], vec[1]);
+    };
+
+    const uint8_t BLANK = 0, COPIED = 1, EXPANDED = 2;
+    std::vector<std::vector<uint8_t>> flag(targetHeight, std::vector<uint8_t>(targetWidth, BLANK));
+
+    for (int i = 0; i < pOriginMesh->n_faces(); i++)
+    {
+        const auto fh = TriMesh::FaceHandle(i);
+
+        auto heha0 = pOriginMesh->halfedge_handle(fh);
+        auto heha1 = pOriginMesh->next_halfedge_handle(heha0);
+        auto heha2 = pOriginMesh->next_halfedge_handle(heha1);
+
+        const auto & va0 = pOriginMesh->texcoord2D(heha0);
+        const auto & va1 = pOriginMesh->texcoord2D(heha1);
+        const auto & va2 = pOriginMesh->texcoord2D(heha2);
+
+        auto hehb0 = pNewMesh->halfedge_handle(fh);
+        auto hehb1 = pNewMesh->next_halfedge_handle(hehb0);
+        auto hehb2 = pNewMesh->next_halfedge_handle(hehb1);
+
+        const auto & vb0 = pNewMesh->texcoord2D(hehb0);
+        const auto & vb1 = pNewMesh->texcoord2D(hehb1);
+        const auto & vb2 = pNewMesh->texcoord2D(hehb2);
+
+        auto t = GetTransformFunc(vb0, vb1, vb2, va0, va1, va2);
+
+        auto aabb = GetTriangleAABBInImageFunc(vb0, vb1, vb2, targetWidth, targetHeight);
+
+        uint32_t yMin = std::get<1>(aabb);
+        uint32_t yMax = std::get<3>(aabb);
+        uint32_t xMin = std::get<0>(aabb);
+        uint32_t xMax = std::get<2>(aabb);
+
+        for (uint32_t y = yMin; y <= yMax; y++)
+        {
+            for (uint32_t x = xMin; x <= xMax; x++)
+            {
+                Vector2 pos(static_cast<Real>(x) / static_cast<Real>(targetWidth - 1), static_cast<Real>(y) / static_cast<Real>(targetHeight - 1));
+                if (IsInsideTriangleFunc(pos, vb0, vb1, vb2))
+                {
+                    Vector2 originPos = ApplyTransformFunc(pos, t);
+
+                    uint32_t srcWidthLimit = pTexture->Width() - 1;
+                    uint32_t srcHeightLimit = pTexture->Height() - 1;
+
+                    auto x0 = static_cast<uint32_t>(std::floor(originPos[0] * srcWidthLimit));
+                    auto y0 = static_cast<uint32_t>(std::floor(originPos[1] * srcHeightLimit));
+                    auto x1 = x0 + 1;
+                    auto y1 = y0 + 1;
+
+                    x0 = std::clamp(x0, 0u, srcWidthLimit);
+                    y0 = std::clamp(y0, 0u, srcHeightLimit);
+                    x1 = std::clamp(x1, 0u, srcWidthLimit);
+                    y1 = std::clamp(y1, 0u, srcHeightLimit);
+
+                    uint8_t * pX0Y0 = pTexture->At(x0, srcHeightLimit - 1u - y0);
+                    uint8_t * pX0Y1 = pTexture->At(x0, srcHeightLimit - 1u - y1);
+                    uint8_t * pX1Y0 = pTexture->At(x1, srcHeightLimit - 1u - y0);
+                    uint8_t * pX1Y1 = pTexture->At(x1, srcHeightLimit - 1u - y1);
+
+                    uint8_t * pDstPixel = integratedTexture.At(x, targetHeight - 1 - y);
+
+                    for (uint32_t c = 0; c < targetChannels; c++)
+                    {
+                        uint32_t sum = static_cast<uint32_t>(pX0Y0[c]) +
+                                       static_cast<uint32_t>(pX0Y1[c]) +
+                                       static_cast<uint32_t>(pX1Y0[c]) +
+                                       static_cast<uint32_t>(pX1Y1[c]);
+
+                        pDstPixel[c] = static_cast<uint8_t>(sum / 4);
+                    }
+
+                    flag[y][x] = COPIED;
+                }
+            }
+        }
+    }
+
+    for (uint32_t y = 0; y < targetWidth; y++)
+    {
+        for (uint32_t x = 0; x < targetHeight; x++)
+        {
+            if (flag[y][x] == BLANK)
+            {
+                uint32_t n = 0;
+                std::vector<uint32_t> sums(targetChannels, 0u);
+
+                uint32_t heightLimit = targetHeight - 1u;
+                uint32_t widthLimit = targetWidth - 1u;
+
+                const uint32_t radius = 4;
+                uint32_t yMin = std::max(y - radius, 0u);
+                uint32_t xMin = std::max(x - radius, 0u);
+                uint32_t yMax = std::min(y + radius, heightLimit);
+                uint32_t xMax = std::min(x + radius, widthLimit);
+
+                for (uint32_t y0 = yMin; y0 <= yMax; y0++)
+                {
+                    for (uint32_t x0 = xMin; x0 <= xMax; x0++)
+                    {
+                        if (flag[y0][x0] == COPIED)
+                        {
+                            n++;
+                            uint8_t * pPixel = integratedTexture.At(x0, heightLimit - y0);
+                            for (uint32_t c = 0; c < targetChannels; c++)
+                            {
+                                sums[c] += static_cast<uint32_t>(pPixel[c]);
+                            }
+                        }
+                    }
+                }
+
+                if (n > 0)
+                {
+                    uint8_t * pPixel = integratedTexture.At(x, heightLimit - y);
+                    for (uint32_t c = 0; c < targetChannels; c++)
+                    {
+                        pPixel[c] = static_cast<uint8_t>(sums[c] / n);
+                    }
+                    flag[y][x] = EXPANDED;
+                }
+            }
+        }
+    }
+
+    integratedTexture.CopyTo(pTexture);
+
+    return true;
+}

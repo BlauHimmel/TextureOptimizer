@@ -15,12 +15,14 @@ public:
 
     bool Create(uint32_t width, uint32_t height, uint32_t channel);
     bool Load(const std::string & filename);
-    bool Write(const std::string & filename);
+    bool Write(const std::string & filename) const;
 
     std::unique_ptr<Texture> Copy() const;
+    void CopyTo(Texture * pTexture) const;
 
-    uint8_t & At(uint32_t x, uint32_t y, uint32_t channels);
-    uint8_t * At(uint32_t x, uint32_t y);
+    uint8_t & At(uint32_t x, uint32_t y, uint32_t channels) const;
+    uint8_t * At(uint32_t x, uint32_t y) const;
+    std::unique_ptr<uint8_t[]> Sample(double x, double y) const;
 
     bool IsValid() const;
     uint32_t Width() const;
@@ -30,7 +32,7 @@ public:
     static std::unique_ptr<Texture> CreateChessBoard(uint32_t width, uint32_t height, uint32_t xCount, uint32_t yCount);
 
 private:
-    static uint8_t * Fetch(Texture * pTexture, uint32_t x, uint32_t y, uint32_t channels);
+    static uint8_t * Fetch(const Texture * pTexture, uint32_t x, uint32_t y, uint32_t channels);
 
 private:
     bool m_bValid = false;

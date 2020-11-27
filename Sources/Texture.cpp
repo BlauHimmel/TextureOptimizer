@@ -41,7 +41,7 @@ bool Texture::Load(const std::string & filename)
     return true;
 }
 
-bool Texture::Write(const std::string & filename)
+bool Texture::Write(const std::string & filename) const
 {
     if (!m_bValid) { return false; }
 
@@ -85,14 +85,55 @@ std::unique_ptr<Texture> Texture::Copy() const
     return texture;
 }
 
-uint8_t & Texture::At(uint32_t x, uint32_t y, uint32_t channels)
+void Texture::CopyTo(Texture * pTexture) const
+{
+    pTexture->m_bValid = m_bValid;
+    pTexture->m_Channels = m_Channels;
+    pTexture->m_Width = m_Width;
+    pTexture->m_Height = m_Height;
+    pTexture->m_Data.reset(new uint8_t[m_Width * m_Height * m_Channels]);
+    memcpy(pTexture->m_Data.get(), m_Data.get(), sizeof(uint8_t) * m_Width * m_Height * m_Channels);
+}
+
+uint8_t & Texture::At(uint32_t x, uint32_t y, uint32_t channels) const
 {
     return *Fetch(this, x, y, channels);
 }
 
-uint8_t * Texture::At(uint32_t x, uint32_t y)
+uint8_t * Texture::At(uint32_t x, uint32_t y) const
 {
     return Fetch(this, x, y, 0);
+}
+
+std::unique_ptr<uint8_t[]> Texture::Sample(double x, double y) const
+{
+    auto x0 = static_cast<uint32_t>(std::floor(x * (m_Width  - 1)));
+    auto y0 = static_cast<uint32_t>(std::floor(y * (m_Height - 1)));
+    auto x1 = x0 + 1;
+    auto y1 = y0 + 1;
+
+    x0 = std::clamp(x0, 0u, m_Width  - 1u);
+    x1 = std::clamp(x1, 0u, m_Width  - 1u);
+    y0 = std::clamp(y0, 0u, m_Height - 1u);
+    y1 = std::clamp(y1, 0u, m_Height - 1u);
+
+    std::unique_ptr<uint8_t[]> pixel(new uint8_t[m_Channels]);
+
+    uint8_t * pX0Y0 = Fetch(this, x0, y0, 0);
+    uint8_t * pX0Y1 = Fetch(this, x0, y1, 0);
+    uint8_t * pX1Y0 = Fetch(this, x1, y0, 0);
+    uint8_t * pX1Y1 = Fetch(this, x1, y1, 0);
+
+    for (uint32_t channel = 0; channel < m_Channels; channel++)
+    {
+        uint32_t sum = static_cast<uint32_t>(pX0Y0[channel]) +
+                       static_cast<uint32_t>(pX0Y1[channel]) +
+                       static_cast<uint32_t>(pX1Y0[channel]) +
+                       static_cast<uint32_t>(pX1Y1[channel]);
+        pixel[channel] = static_cast<uint8_t>(sum / 4);
+    }
+
+    return pixel;
 }
 
 bool Texture::IsValid() const
@@ -157,7 +198,7 @@ std::unique_ptr<Texture> Texture::CreateChessBoard(uint32_t width, uint32_t heig
     return texture;
 }
 
-uint8_t * Texture::Fetch(Texture * pTexture, uint32_t x, uint32_t y, uint32_t channels)
+uint8_t * Texture::Fetch(const Texture * pTexture, uint32_t x, uint32_t y, uint32_t channels)
 {
     assert(pTexture != nullptr && pTexture->m_bValid && x < pTexture->m_Width && y < pTexture->m_Height && channels < pTexture->m_Channels);
     return pTexture->m_Data.get() + ((y * pTexture->m_Width + x) * pTexture->m_Channels + channels);
