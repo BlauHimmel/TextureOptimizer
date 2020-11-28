@@ -80,23 +80,23 @@ bool AtlasMerger::Run(uint32_t width, uint32_t height, EParameterization paramet
 
         m_pTexture->CopyTo(&subTextures[i]);
 
-        Logger::Info("[%zd] Removing small components of the submesh...", i);
+        Logger::Info("Removing small components of the submesh [%zd]...", i);
         RemoveSmallComponent(&subMeshes[i]);
-        Logger::Info("[%zd] <RemoveSmallComponent> Completed!", i);
+        Logger::Info("<RemoveSmallComponent> Completed [%zd]!", i);
 
-        Logger::Info("[%zd] Repairing non-manifold vertices of the submesh...", i);
+        Logger::Info("Repairing non-manifold vertices of the submesh [%zd]...", i);
         RepairNonManifold(&subMeshes[i]);
-        Logger::Info("[%zd] <RepairNonManifold> Completed!", i);
+        Logger::Info("<RepairNonManifold> Completed [%zd]!", i);
 
-        Logger::Info("[%zd] Cutting the submesh...", i);
+        Logger::Info("Cutting the submesh [%zd]...", i);
         if (!CutToDisk(&subMeshes[i]) || GetMeshGenus(&subMeshes[i]) != 0)
         {
-            Logger::Error("[%zd] Cannot cut the submesh into a topological disk.", i);
+            Logger::Error("Cannot cut the submesh [%zd] into a topological disk.", i);
             continue;
         }
-        Logger::Info("[%zd] <CutToDisk> Completed!", i);
+        Logger::Info("<CutToDisk> Completed [%zd]!", i);
 
-        Logger::Info("[%zd] Parameterizing the submesh...", i);
+        Logger::Info("Parameterizing the submesh [%zd]...", i);
         TriMesh uvMesh(subMeshes[i]);
         TriMesh originMesh(subMeshes[i]);
         if (parameterization == EParameterization::EBarycentric)
@@ -113,26 +113,26 @@ bool AtlasMerger::Run(uint32_t width, uint32_t height, EParameterization paramet
         }
         else
         {
-            Logger::Error("[%zd] Unkonwn parameterization method.", i);
+            Logger::Error("Unkonwn parameterization method [%zd].", i);
             continue;
         }
-        Logger::Info("[%zd] <MeshParameterization> Completed!", i);
+        Logger::Info("<MeshParameterization> Completed [%zd]!", i);
 
-        Logger::Info("[%zd] Applying paramterization result...", i);
+        Logger::Info("Applying paramterization result [%zd]...", i);
         if (!MeshUVTransfer(&subMeshes[i], &uvMesh))
         {
-            Logger::Error("[%zd] Error occurred when applying parameterizing result.", i);
+            Logger::Error("Error occurred when applying parameterizing result [%zd].", i);
             continue;
         }
-        Logger::Info("[%zd] <MeshUVTransfer> Completed!", i);
+        Logger::Info("<MeshUVTransfer> Completed [%zd]!", i);
 
-        Logger::Info("[%zd] Integrating the subtexture...", i);
+        Logger::Info("Integrating the subtexture [%zd]...", i);
         if (!TextureIntegrate(&originMesh, &subMeshes[i], &subTextures[i], width, height))
         {
-            Logger::Error("[%zd] Error occurred when integrating the subtexture.", i);
+            Logger::Error("Error occurred when integrating the subtexture [%zd].", i);
             continue;
         }
-        Logger::Info("[%zd] <TextureIntegrate> Completed!", i);
+        Logger::Info("<TextureIntegrate> Completed [%zd]!", i);
 
         Logger::Info("Submesh %zd completed!", i);
     }
@@ -166,7 +166,7 @@ bool AtlasMerger::Run(uint32_t width, uint32_t height, EParameterization paramet
         }
         Logger::Info("Successfully write submesh [%zd]: \"%s\"!", i, submeshOutput.c_str());
 
-        Logger::Info("[%zd] Writing subtexture...", i);
+        Logger::Info("Writing subtexture [%zd]...", i);
         if (!subTextures[i].Write(subtextureOutput))
         {
             Logger::Error("Could not write subtexture [%zd]: \"%s\"!", i, subtextureOutput.c_str());

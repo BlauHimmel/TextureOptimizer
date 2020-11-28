@@ -22,7 +22,7 @@ size_t MeshBoundaryCount(const TriMesh * pMesh);
 
 void RemoveSmallComponent(TriMesh * pMesh);
 void RepairNonManifold(TriMesh * pMesh);
-bool CutToDisk(TriMesh * pMesh);
+bool CutToDisk(TriMesh * pMesh, size_t seedFaceNum = 100);
 
 int32_t GetMeshEuler(const TriMesh * pMesh);
 int32_t GetMeshGenus(const TriMesh * pMesh);
@@ -32,7 +32,7 @@ bool MeshUVTransfer(TriMesh * pMesh, const TriMesh * pUVMesh);
 void SLIMProxy(TriMesh * pMesh);
 void EBPProxy(TriMesh * pMesh);
 
-bool TextureIntegrate(const TriMesh * pOriginMesh, const TriMesh * pNewMesh, Texture * pTexture, uint32_t width, uint32_t height);
+bool TextureIntegrate(const TriMesh * pOriginMesh, const TriMesh * pNewMesh, Texture * pTexture, uint32_t width, uint32_t height, uint32_t expandRadius = 4);
 
 
 #endif //MESH_UTILS_HPP

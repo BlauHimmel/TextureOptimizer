@@ -326,10 +326,9 @@ void RepairNonManifold(TriMesh * pMesh)
     Logger::Info("Non-manifold fixed, %u new vertices created!", newVertexNum);
 }
 
-bool CutToDisk(TriMesh * pMesh)
+bool CutToDisk(TriMesh * pMesh, size_t seedFaceNum)
 {
-    const size_t SEED_FACE_NUM = 100;
-    size_t faceIdxIncrement = pMesh->n_faces() / SEED_FACE_NUM;
+    size_t faceIdxIncrement = pMesh->n_faces() / seedFaceNum;
 
     std::vector<size_t> seedIdxs;
     for (size_t seedIdx = 0; seedIdx < pMesh->n_faces(); seedIdx += faceIdxIncrement)
@@ -340,7 +339,13 @@ bool CutToDisk(TriMesh * pMesh)
     bmc::progress_bar progressBar(0, seedIdxs.size(), 80, false, true);
     std::mutex mutex;
 
-    auto KernelFunc = [&seedIdxs, &pMesh, &mutex, &progressBar](tbb::blocked_range<size_t> & range, std::pair<size_t, Real> value) -> std::pair<size_t, Real>
+    Real totalArea = 0.0;
+    for (const auto fh : pMesh->faces())
+    {
+        totalArea += pMesh->calc_face_area(fh);
+    }
+
+    auto KernelFunc = [&seedIdxs, &pMesh, &mutex, &progressBar, totalArea](tbb::blocked_range<size_t> & range, std::pair<size_t, Real> value) -> std::pair<size_t, Real>
     {
         for (size_t i = range.begin(); i != range.end(); i++)
         {
@@ -354,10 +359,12 @@ bool CutToDisk(TriMesh * pMesh)
             auto boundaryDistances = MeshBoundaryDistances(&testMesh);
             if (boundaryDistances.size() != 1) { continue; }
 
-            if (boundaryDistances[0] < value.second)
+            Real priority = std::pow(boundaryDistances[0], 2.0) / (4.0 * M_PI * totalArea);
+
+            if (priority < value.second)
             {
                 value.first = seedIdxs[i];
-                value.second = boundaryDistances[0];
+                value.second = priority;
             }
         }
 
@@ -614,7 +621,7 @@ void EBPProxy(TriMesh * pMesh)
     }
 }
 
-bool TextureIntegrate(const TriMesh * pOriginMesh, const TriMesh * pNewMesh, Texture * pTexture, uint32_t width, uint32_t height)
+bool TextureIntegrate(const TriMesh * pOriginMesh, const TriMesh * pNewMesh, Texture * pTexture, uint32_t width, uint32_t height, uint32_t expandRadius)
 {
     if (pOriginMesh->n_vertices() != pNewMesh->n_vertices() ||
         pOriginMesh->n_edges() != pNewMesh->n_edges() ||
@@ -760,10 +767,10 @@ bool TextureIntegrate(const TriMesh * pOriginMesh, const TriMesh * pNewMesh, Tex
                     x1 = std::clamp(x1, 0u, srcWidthLimit);
                     y1 = std::clamp(y1, 0u, srcHeightLimit);
 
-                    uint8_t * pX0Y0 = pTexture->At(x0, srcHeightLimit - 1u - y0);
-                    uint8_t * pX0Y1 = pTexture->At(x0, srcHeightLimit - 1u - y1);
-                    uint8_t * pX1Y0 = pTexture->At(x1, srcHeightLimit - 1u - y0);
-                    uint8_t * pX1Y1 = pTexture->At(x1, srcHeightLimit - 1u - y1);
+                    uint8_t * pX0Y0 = pTexture->At(x0, srcHeightLimit - y0);
+                    uint8_t * pX0Y1 = pTexture->At(x0, srcHeightLimit - y1);
+                    uint8_t * pX1Y0 = pTexture->At(x1, srcHeightLimit - y0);
+                    uint8_t * pX1Y1 = pTexture->At(x1, srcHeightLimit - y1);
 
                     uint8_t * pDstPixel = integratedTexture.At(x, targetHeight - 1 - y);
 
@@ -795,11 +802,10 @@ bool TextureIntegrate(const TriMesh * pOriginMesh, const TriMesh * pNewMesh, Tex
                 uint32_t heightLimit = targetHeight - 1u;
                 uint32_t widthLimit = targetWidth - 1u;
 
-                const uint32_t radius = 4;
-                uint32_t yMin = std::max(y - radius, 0u);
-                uint32_t xMin = std::max(x - radius, 0u);
-                uint32_t yMax = std::min(y + radius, heightLimit);
-                uint32_t xMax = std::min(x + radius, widthLimit);
+                uint32_t yMin = std::max(y - expandRadius, 0u);
+                uint32_t xMin = std::max(x - expandRadius, 0u);
+                uint32_t yMax = std::min(y + expandRadius, heightLimit);
+                uint32_t xMax = std::min(x + expandRadius, widthLimit);
 
                 for (uint32_t y0 = yMin; y0 <= yMax; y0++)
                 {
