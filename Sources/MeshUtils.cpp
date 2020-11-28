@@ -426,7 +426,7 @@ bool MeshUVTransfer(TriMesh * pMesh, const TriMesh * pUVMesh)
 
     auto KernelFunc = [&](tbb::blocked_range<size_t> & range)
     {
-        for (size_t i = range.begin(); i < range.end(); i++)
+        for (size_t i = range.begin(); i != range.end(); i++)
         {
             const auto heh = TriMesh::HalfedgeHandle(int(i));
             const auto vh = pUVMesh->to_vertex_handle(heh);
@@ -713,128 +713,142 @@ bool TextureIntegrate(const TriMesh * pOriginMesh, const TriMesh * pNewMesh, Tex
         return Vector2(vec[0], vec[1]);
     };
 
-    const uint8_t BLANK = 0, COPIED = 1, EXPANDED = 2;
+    uint8_t BLANK = 0, COPIED = 1, EXPANDED = 2;
     std::vector<std::vector<uint8_t>> flag(targetHeight, std::vector<uint8_t>(targetWidth, BLANK));
 
-    for (int i = 0; i < pOriginMesh->n_faces(); i++)
+    auto CopyKernel = [&pOriginMesh, &pNewMesh, &pTexture, &GetTransformFunc, &GetTriangleAABBInImageFunc, &IsInsideTriangleFunc,
+        &ApplyTransformFunc, &targetWidth, &targetHeight, &targetChannels, &integratedTexture, &flag, COPIED](tbb::blocked_range<int> & range)
     {
-        const auto fh = TriMesh::FaceHandle(i);
-
-        auto heha0 = pOriginMesh->halfedge_handle(fh);
-        auto heha1 = pOriginMesh->next_halfedge_handle(heha0);
-        auto heha2 = pOriginMesh->next_halfedge_handle(heha1);
-
-        const auto & va0 = pOriginMesh->texcoord2D(heha0);
-        const auto & va1 = pOriginMesh->texcoord2D(heha1);
-        const auto & va2 = pOriginMesh->texcoord2D(heha2);
-
-        auto hehb0 = pNewMesh->halfedge_handle(fh);
-        auto hehb1 = pNewMesh->next_halfedge_handle(hehb0);
-        auto hehb2 = pNewMesh->next_halfedge_handle(hehb1);
-
-        const auto & vb0 = pNewMesh->texcoord2D(hehb0);
-        const auto & vb1 = pNewMesh->texcoord2D(hehb1);
-        const auto & vb2 = pNewMesh->texcoord2D(hehb2);
-
-        auto t = GetTransformFunc(vb0, vb1, vb2, va0, va1, va2);
-
-        auto aabb = GetTriangleAABBInImageFunc(vb0, vb1, vb2, targetWidth, targetHeight);
-
-        uint32_t yMin = std::get<1>(aabb);
-        uint32_t yMax = std::get<3>(aabb);
-        uint32_t xMin = std::get<0>(aabb);
-        uint32_t xMax = std::get<2>(aabb);
-
-        for (uint32_t y = yMin; y <= yMax; y++)
+        for (int i = range.begin(); i != range.end(); i++)
         {
-            for (uint32_t x = xMin; x <= xMax; x++)
+            const auto fh = TriMesh::FaceHandle(i);
+
+            auto heha0 = pOriginMesh->halfedge_handle(fh);
+            auto heha1 = pOriginMesh->next_halfedge_handle(heha0);
+            auto heha2 = pOriginMesh->next_halfedge_handle(heha1);
+
+            const auto & va0 = pOriginMesh->texcoord2D(heha0);
+            const auto & va1 = pOriginMesh->texcoord2D(heha1);
+            const auto & va2 = pOriginMesh->texcoord2D(heha2);
+
+            auto hehb0 = pNewMesh->halfedge_handle(fh);
+            auto hehb1 = pNewMesh->next_halfedge_handle(hehb0);
+            auto hehb2 = pNewMesh->next_halfedge_handle(hehb1);
+
+            const auto & vb0 = pNewMesh->texcoord2D(hehb0);
+            const auto & vb1 = pNewMesh->texcoord2D(hehb1);
+            const auto & vb2 = pNewMesh->texcoord2D(hehb2);
+
+            auto t = GetTransformFunc(vb0, vb1, vb2, va0, va1, va2);
+
+            auto aabb = GetTriangleAABBInImageFunc(vb0, vb1, vb2, targetWidth, targetHeight);
+
+            uint32_t yMin = std::get<1>(aabb);
+            uint32_t yMax = std::get<3>(aabb);
+            uint32_t xMin = std::get<0>(aabb);
+            uint32_t xMax = std::get<2>(aabb);
+
+            for (uint32_t y = yMin; y <= yMax; y++)
             {
-                Vector2 pos(static_cast<Real>(x) / static_cast<Real>(targetWidth - 1), static_cast<Real>(y) / static_cast<Real>(targetHeight - 1));
-                if (IsInsideTriangleFunc(pos, vb0, vb1, vb2))
+                for (uint32_t x = xMin; x <= xMax; x++)
                 {
-                    Vector2 originPos = ApplyTransformFunc(pos, t);
-
-                    uint32_t srcWidthLimit = pTexture->Width() - 1;
-                    uint32_t srcHeightLimit = pTexture->Height() - 1;
-
-                    auto x0 = static_cast<uint32_t>(std::floor(originPos[0] * srcWidthLimit));
-                    auto y0 = static_cast<uint32_t>(std::floor(originPos[1] * srcHeightLimit));
-                    auto x1 = x0 + 1;
-                    auto y1 = y0 + 1;
-
-                    x0 = std::clamp(x0, 0u, srcWidthLimit);
-                    y0 = std::clamp(y0, 0u, srcHeightLimit);
-                    x1 = std::clamp(x1, 0u, srcWidthLimit);
-                    y1 = std::clamp(y1, 0u, srcHeightLimit);
-
-                    uint8_t * pX0Y0 = pTexture->At(x0, srcHeightLimit - y0);
-                    uint8_t * pX0Y1 = pTexture->At(x0, srcHeightLimit - y1);
-                    uint8_t * pX1Y0 = pTexture->At(x1, srcHeightLimit - y0);
-                    uint8_t * pX1Y1 = pTexture->At(x1, srcHeightLimit - y1);
-
-                    uint8_t * pDstPixel = integratedTexture.At(x, targetHeight - 1 - y);
-
-                    for (uint32_t c = 0; c < targetChannels; c++)
+                    Vector2 pos(static_cast<Real>(x) / static_cast<Real>(targetWidth - 1), static_cast<Real>(y) / static_cast<Real>(targetHeight - 1));
+                    if (IsInsideTriangleFunc(pos, vb0, vb1, vb2))
                     {
-                        uint32_t sum = static_cast<uint32_t>(pX0Y0[c]) +
-                                       static_cast<uint32_t>(pX0Y1[c]) +
-                                       static_cast<uint32_t>(pX1Y0[c]) +
-                                       static_cast<uint32_t>(pX1Y1[c]);
+                        Vector2 originPos = ApplyTransformFunc(pos, t);
 
-                        pDstPixel[c] = static_cast<uint8_t>(sum / 4);
+                        uint32_t srcWidthLimit = pTexture->Width() - 1;
+                        uint32_t srcHeightLimit = pTexture->Height() - 1;
+
+                        auto x0 = static_cast<uint32_t>(std::floor(originPos[0] * srcWidthLimit));
+                        auto y0 = static_cast<uint32_t>(std::floor(originPos[1] * srcHeightLimit));
+                        auto x1 = x0 + 1;
+                        auto y1 = y0 + 1;
+
+                        x0 = std::clamp(x0, 0u, srcWidthLimit);
+                        y0 = std::clamp(y0, 0u, srcHeightLimit);
+                        x1 = std::clamp(x1, 0u, srcWidthLimit);
+                        y1 = std::clamp(y1, 0u, srcHeightLimit);
+
+                        uint8_t * pX0Y0 = pTexture->At(x0, srcHeightLimit - y0);
+                        uint8_t * pX0Y1 = pTexture->At(x0, srcHeightLimit - y1);
+                        uint8_t * pX1Y0 = pTexture->At(x1, srcHeightLimit - y0);
+                        uint8_t * pX1Y1 = pTexture->At(x1, srcHeightLimit - y1);
+
+                        uint8_t * pDstPixel = integratedTexture.At(x, targetHeight - 1 - y);
+
+                        for (uint32_t c = 0; c < targetChannels; c++)
+                        {
+                            uint32_t sum = static_cast<uint32_t>(pX0Y0[c]) +
+                                           static_cast<uint32_t>(pX0Y1[c]) +
+                                           static_cast<uint32_t>(pX1Y0[c]) +
+                                           static_cast<uint32_t>(pX1Y1[c]);
+
+                            pDstPixel[c] = static_cast<uint8_t>(sum / 4);
+                        }
+
+                        flag[y][x] = COPIED;
                     }
-
-                    flag[y][x] = COPIED;
                 }
             }
         }
-    }
+    };
 
-    for (uint32_t y = 0; y < targetWidth; y++)
+    tbb::blocked_range<int> CopyRange(0, static_cast<int>(pOriginMesh->n_faces()));
+    tbb::parallel_for(CopyRange, CopyKernel);
+
+    auto ExpandKernel = [&targetWidth, &targetHeight, &targetChannels, &expandRadius, &flag, &integratedTexture, BLANK,
+        COPIED, EXPANDED](tbb::blocked_range<uint32_t> & range)
     {
-        for (uint32_t x = 0; x < targetHeight; x++)
+        for (uint32_t y = range.begin(); y != range.end(); y++)
         {
-            if (flag[y][x] == BLANK)
+            for (uint32_t x = 0; x < targetHeight; x++)
             {
-                uint32_t n = 0;
-                std::vector<uint32_t> sums(targetChannels, 0u);
-
-                uint32_t heightLimit = targetHeight - 1u;
-                uint32_t widthLimit = targetWidth - 1u;
-
-                uint32_t yMin = std::max(y - expandRadius, 0u);
-                uint32_t xMin = std::max(x - expandRadius, 0u);
-                uint32_t yMax = std::min(y + expandRadius, heightLimit);
-                uint32_t xMax = std::min(x + expandRadius, widthLimit);
-
-                for (uint32_t y0 = yMin; y0 <= yMax; y0++)
+                if (flag[y][x] == BLANK)
                 {
-                    for (uint32_t x0 = xMin; x0 <= xMax; x0++)
+                    uint32_t n = 0;
+                    std::vector<uint32_t> sums(targetChannels, 0u);
+
+                    uint32_t heightLimit = targetHeight - 1u;
+                    uint32_t widthLimit = targetWidth - 1u;
+
+                    uint32_t yMin = std::max(y - expandRadius, 0u);
+                    uint32_t xMin = std::max(x - expandRadius, 0u);
+                    uint32_t yMax = std::min(y + expandRadius, heightLimit);
+                    uint32_t xMax = std::min(x + expandRadius, widthLimit);
+
+                    for (uint32_t y0 = yMin; y0 <= yMax; y0++)
                     {
-                        if (flag[y0][x0] == COPIED)
+                        for (uint32_t x0 = xMin; x0 <= xMax; x0++)
                         {
-                            n++;
-                            uint8_t * pPixel = integratedTexture.At(x0, heightLimit - y0);
-                            for (uint32_t c = 0; c < targetChannels; c++)
+                            if (flag[y0][x0] == COPIED)
                             {
-                                sums[c] += static_cast<uint32_t>(pPixel[c]);
+                                n++;
+                                uint8_t * pPixel = integratedTexture.At(x0, heightLimit - y0);
+                                for (uint32_t c = 0; c < targetChannels; c++)
+                                {
+                                    sums[c] += static_cast<uint32_t>(pPixel[c]);
+                                }
                             }
                         }
                     }
-                }
 
-                if (n > 0)
-                {
-                    uint8_t * pPixel = integratedTexture.At(x, heightLimit - y);
-                    for (uint32_t c = 0; c < targetChannels; c++)
+                    if (n > 0)
                     {
-                        pPixel[c] = static_cast<uint8_t>(sums[c] / n);
+                        uint8_t * pPixel = integratedTexture.At(x, heightLimit - y);
+                        for (uint32_t c = 0; c < targetChannels; c++)
+                        {
+                            pPixel[c] = static_cast<uint8_t>(sums[c] / n);
+                        }
+                        flag[y][x] = EXPANDED;
                     }
-                    flag[y][x] = EXPANDED;
                 }
             }
         }
-    }
+    };
+
+    tbb::blocked_range<uint32_t> ExpandRange(0u, targetWidth);
+    tbb::parallel_for(ExpandRange, ExpandKernel);
 
     integratedTexture.CopyTo(pTexture);
 
