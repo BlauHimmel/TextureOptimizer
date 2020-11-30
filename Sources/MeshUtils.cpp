@@ -326,7 +326,7 @@ void RepairNonManifold(TriMesh * pMesh)
     Logger::Info("Non-manifold fixed, %u new vertices created!", newVertexNum);
 }
 
-bool CutToDisk(TriMesh * pMesh, size_t seedFaceNum)
+bool CutToDisk(TriMesh * pMesh, const Real * pTotalArea, size_t seedFaceNum)
 {
     size_t faceIdxIncrement = pMesh->n_faces() / seedFaceNum;
 
@@ -340,9 +340,16 @@ bool CutToDisk(TriMesh * pMesh, size_t seedFaceNum)
     std::mutex mutex;
 
     Real totalArea = 0.0;
-    for (const auto fh : pMesh->faces())
+    if (pTotalArea == nullptr)
     {
-        totalArea += pMesh->calc_face_area(fh);
+        for (const auto fh : pMesh->faces())
+        {
+            totalArea += pMesh->calc_face_area(fh);
+        }
+    }
+    else
+    {
+        totalArea = *pTotalArea;
     }
 
     auto KernelFunc = [&seedIdxs, &pMesh, &mutex, &progressBar, totalArea](tbb::blocked_range<size_t> & range, std::pair<size_t, Real> value) -> std::pair<size_t, Real>

@@ -19,6 +19,7 @@ bool Texture::Create(uint32_t width, uint32_t height, uint32_t channel)
     m_Height = height;
     m_Channels = channel;
     m_Data.reset(new uint8_t[width * height * channel]);
+    memset(m_Data.get(), 0, sizeof(uint8_t) * width * height * channel);
 
     return true;
 }

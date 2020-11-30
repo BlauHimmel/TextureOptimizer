@@ -65,6 +65,19 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
     Logger::Info("<CreateSubMeshFromAtlas> Completed!");
 
     std::unique_ptr<Texture[]> subTextures(new Texture[atlasInfo->atlasNum]);
+    std::vector<Real> subMeshAreas(atlasInfo->atlasNum, 0);
+    Real maxSubMeshArea = 0.0;
+
+    for (size_t i = 0; i < atlasInfo->atlasNum; i++)
+    {
+        Real totalArea = 0.0;
+        for (const auto fh : subMeshes[i].faces())
+        {
+            totalArea += subMeshes[i].calc_face_area(fh);
+        }
+        subMeshAreas[i] = totalArea;
+        maxSubMeshArea = std::max(maxSubMeshArea, totalArea);
+    }
 
     for (size_t i = 0; i < atlasInfo->atlasNum; i++)
     {
@@ -83,7 +96,7 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
         if (!IsDiskTopology(&subMeshes[i]))
         {
             Logger::Info("Cutting the submesh [%zd]...", i);
-            if (!CutToDisk(&subMeshes[i]) || GetMeshGenus(&subMeshes[i]) != 0 || GetMeshEuler(&subMeshes[i]) != 1)
+            if (!CutToDisk(&subMeshes[i], &subMeshAreas[i]) || GetMeshGenus(&subMeshes[i]) != 0 || GetMeshEuler(&subMeshes[i]) != 1)
             {
                 Logger::Error("Cannot cut the submesh [%zd] into a topological disk.", i);
                 continue;
@@ -126,7 +139,12 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
         Logger::Info("<MeshUVTransfer> Completed [%zd]!", i);
 
         Logger::Info("Integrating the subtexture [%zd]...", i);
-        if (!TextureIntegrate(&originMesh, &subMeshes[i], &subTextures[i], width, height))
+
+        Real sizeCoeff = std::sqrt(subMeshAreas[i] / maxSubMeshArea);
+        auto integratedWidth = static_cast<uint32_t>(width * sizeCoeff);
+        auto integratedHeight = static_cast<uint32_t>(height * sizeCoeff);
+
+        if (!TextureIntegrate(&originMesh, &subMeshes[i], &subTextures[i], integratedWidth, integratedHeight))
         {
             Logger::Error("Error occurred when integrating the subtexture [%zd].", i);
             continue;

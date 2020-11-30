@@ -22,7 +22,7 @@ size_t MeshBoundaryCount(const TriMesh * pMesh);
 
 void RemoveSmallComponent(TriMesh * pMesh);
 void RepairNonManifold(TriMesh * pMesh);
-bool CutToDisk(TriMesh * pMesh, size_t seedFaceNum = 100);
+bool CutToDisk(TriMesh * pMesh, const Real * pTotalArea = nullptr, size_t seedFaceNum = 100);
 
 int32_t GetMeshEuler(const TriMesh * pMesh);
 int32_t GetMeshGenus(const TriMesh * pMesh);
