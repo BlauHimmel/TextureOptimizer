@@ -1,5 +1,5 @@
-#ifndef ATLAS_MERGER_HPP
-#define ATLAS_MERGER_HPP
+#ifndef TEXTURE_OPTIMIZER_V2_HPP
+#define TEXTURE_OPTIMIZER_V2_HPP
 
 #include "Declaration.hpp"
 #include "Texture.hpp"
@@ -18,10 +18,10 @@ struct AtlasInfo
     size_t atlasNum = 0;
 };
 
-class AtlasMerger
+class TextureOptimizerV2
 {
 public:
-    explicit AtlasMerger(TriMesh * pMesh, Texture * pTexture) : m_pMesh(pMesh), m_pTexture(pTexture) { }
+    explicit TextureOptimizerV2(TriMesh * pMesh, Texture * pTexture) : m_pMesh(pMesh), m_pTexture(pTexture) { }
     bool Run(uint32_t width, uint32_t height, EParameterization parameterization, const std::string & meshOutput, const std::string & textureOutput);
 
 private:
@@ -46,4 +46,4 @@ private:
     Texture * m_pTexture;
 };
 
-#endif //ATLAS_MERGER_HPP
+#endif //TEXTURE_OPTIMIZER_V2_HPP

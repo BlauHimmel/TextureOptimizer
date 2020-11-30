@@ -81,7 +81,7 @@ std::vector<std::vector<double>> BiljectivePara::parameterization()
 	time_end = clock();
 	double time_consumption = (time_end - time_beg) / 1000.0;
 	
-	cout << "Complete! Time consumption: " << time_consumption << "; Mesh energy: " << last_mesh_energy/4 << ";	Run iterations: " << iteration_count << endl;
+	//cout << "Complete! Time consumption: " << time_consumption << "; Mesh energy: " << last_mesh_energy/4 << ";	Run iterations: " << iteration_count << endl;
 
 	return write_obj();
 }
@@ -110,7 +110,7 @@ double BiljectivePara::adjust_weight(double conv_mesh, double last_mesh_energy)
 void BiljectivePara::load()
 {
 	is_initialization = true;
-	cout << "EBP begin ..." << endl;
+	//cout << "EBP begin ..." << endl;
 
 	int v_num = mesh.n_vertices();
 	int f_num = mesh.n_faces();

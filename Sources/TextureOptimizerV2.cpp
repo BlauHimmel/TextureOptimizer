@@ -1,4 +1,4 @@
-#include "AtlasMerger.hpp"
+#include "TextureOptimizerV2.hpp"
 
 #include <unordered_set>
 #include <queue>
@@ -11,7 +11,7 @@
 
 const char * MESH_FPROP_ATLAS_INDEX = "atlasIdx";
 
-bool AtlasMerger::Run(uint32_t width, uint32_t height, EParameterization parameterization, const std::string & meshOutput, const std::string & textureOutput)
+bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization parameterization, const std::string & meshOutput, const std::string & textureOutput)
 {
     if (m_pMesh == nullptr || m_pTexture == nullptr || !m_pTexture->IsValid())
     {
@@ -195,7 +195,7 @@ struct TexCoord2DHasher
     }
 };
 
-std::unique_ptr<AtlasInfo> AtlasMerger::MarkAtlasIndex(TriMesh * pMesh)
+std::unique_ptr<AtlasInfo> TextureOptimizerV2::MarkAtlasIndex(TriMesh * pMesh)
 {
     if (pMesh == nullptr) { return nullptr; }
 
@@ -308,7 +308,7 @@ std::unique_ptr<AtlasInfo> AtlasMerger::MarkAtlasIndex(TriMesh * pMesh)
     return atlasInfo;
 }
 
-size_t AtlasMerger::MergeAtlas(TriMesh * pMesh, AtlasInfo * pAtlasInfo)
+size_t TextureOptimizerV2::MergeAtlas(TriMesh * pMesh, AtlasInfo * pAtlasInfo)
 {
     if (pMesh == nullptr || pAtlasInfo == nullptr)
     {
@@ -608,7 +608,7 @@ size_t AtlasMerger::MergeAtlas(TriMesh * pMesh, AtlasInfo * pAtlasInfo)
     return pAtlasInfo->atlasNum;
 }
 
-std::unique_ptr<AtlasInfo> AtlasMerger::MeshClustering(TriMesh * pMesh)
+std::unique_ptr<AtlasInfo> TextureOptimizerV2::MeshClustering(TriMesh * pMesh)
 {
     if (pMesh == nullptr)
     {
@@ -652,7 +652,7 @@ std::unique_ptr<AtlasInfo> AtlasMerger::MeshClustering(TriMesh * pMesh)
     return atlasInfo;
 }
 
-std::unique_ptr<TriMesh[]> AtlasMerger::CreateSubMeshFromAtlas(const TriMesh * pMesh, AtlasInfo * pAtlasInfo)
+std::unique_ptr<TriMesh[]> TextureOptimizerV2::CreateSubMeshFromAtlas(const TriMesh * pMesh, AtlasInfo * pAtlasInfo)
 {
     if (pMesh == nullptr || pAtlasInfo == nullptr)
     {
@@ -706,7 +706,7 @@ std::unique_ptr<TriMesh[]> AtlasMerger::CreateSubMeshFromAtlas(const TriMesh * p
     return subMeshes;
 }
 
-bool AtlasMerger::MergeResultAndWrite(const TriMesh * pMeshes, const Texture * pTextures, size_t clusterNum,
+bool TextureOptimizerV2::MergeResultAndWrite(const TriMesh * pMeshes, const Texture * pTextures, size_t clusterNum,
     uint32_t mergedTextureWidth, uint32_t mergedTextureHeight, uint32_t mergedTextureChannels,
     const std::string & meshOutput, const std::string & textureOutput)
 {
@@ -820,7 +820,7 @@ bool AtlasMerger::MergeResultAndWrite(const TriMesh * pMeshes, const Texture * p
     return bSuccessMesh && bSuccessTexture;
 }
 
-void AtlasMerger::MergeAtlasInfoAndFProperty(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, size_t source, size_t target)
+void TextureOptimizerV2::MergeAtlasInfoAndFProperty(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, size_t source, size_t target)
 {
     std::set<int> & atlasEdges1 = pAtlasInfo->atlasEdges[source];
     pAtlasInfo->atlasEdges[target].insert(atlasEdges1.begin(), atlasEdges1.end());
@@ -845,7 +845,7 @@ void AtlasMerger::MergeAtlasInfoAndFProperty(AtlasInfo * pAtlasInfo, TriMesh * p
     pAtlasInfo->atlasNum--;
 }
 
-void AtlasMerger::RemapAtlasInfoKeyInSequence(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, const std::set<size_t> & atlasIdxSet)
+void TextureOptimizerV2::RemapAtlasInfoKeyInSequence(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, const std::set<size_t> & atlasIdxSet)
 {
     std::unordered_map<size_t, size_t> atlasIdxRemap;
     size_t remappedIdx = 0;
@@ -899,7 +899,7 @@ void AtlasMerger::RemapAtlasInfoKeyInSequence(AtlasInfo * pAtlasInfo, TriMesh * 
     pAtlasInfo->atlasHalfedges = std::move(newAtlasHalfedges);
 }
 
-size_t AtlasMerger::IntersectNum(const std::set<int> & edges0, const std::set<int> & edges1)
+size_t TextureOptimizerV2::IntersectNum(const std::set<int> & edges0, const std::set<int> & edges1)
 {
     size_t intersectLength = 0;
     for (int edge0 : edges0)
@@ -912,7 +912,7 @@ size_t AtlasMerger::IntersectNum(const std::set<int> & edges0, const std::set<in
     return intersectLength;
 }
 
-bool AtlasMerger::IsIntersect(const std::set<int> & edges0, const std::set<int> & edges1)
+bool TextureOptimizerV2::IsIntersect(const std::set<int> & edges0, const std::set<int> & edges1)
 {
     bool bConnected = false;
     for (int edge0 : edges0)
@@ -926,7 +926,7 @@ bool AtlasMerger::IsIntersect(const std::set<int> & edges0, const std::set<int> 
     return bConnected;
 }
 
-void AtlasMerger::SortAtlasSize(std::vector<std::pair<size_t, size_t>> & atlasSizes)
+void TextureOptimizerV2::SortAtlasSize(std::vector<std::pair<size_t, size_t>> & atlasSizes)
 {
     std::sort(atlasSizes.begin(), atlasSizes.end(),
     [](const std::pair<size_t, size_t> & lhs, std::pair<size_t, size_t> & rhs)
@@ -935,7 +935,7 @@ void AtlasMerger::SortAtlasSize(std::vector<std::pair<size_t, size_t>> & atlasSi
     });
 }
 
-int32_t AtlasMerger::GetAtlasGenus(AtlasInfo * pAtlasInfo, size_t atlasIdx)
+int32_t TextureOptimizerV2::GetAtlasGenus(AtlasInfo * pAtlasInfo, size_t atlasIdx)
 {
     size_t vertexNum = pAtlasInfo->atlasVertices[atlasIdx].size();
     size_t edgeNum = pAtlasInfo->atlasEdges[atlasIdx].size();

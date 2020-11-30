@@ -7,7 +7,6 @@
 #include "TextureOptimizer.hpp"
 #include "Logger.hpp"
 #include "MeshUtils.hpp"
-#include "AtlasMerger.hpp"
 
 int main(int argc, const char ** argv)
 {

@@ -4,10 +4,9 @@
 
 #include <lyra/lyra.hpp>
 
-#include "TextureOptimizer.hpp"
 #include "Logger.hpp"
 #include "MeshUtils.hpp"
-#include "AtlasMerger.hpp"
+#include "TextureOptimizerV2.hpp"
 
 int main(int argc, const char ** argv)
 {
@@ -96,8 +95,8 @@ int main(int argc, const char ** argv)
     /* ************************ run optimizer ************************ */
 
     Logger::Info("Optimizing the texture...");
-    AtlasMerger atlasMerger(&mesh, &texture);
-    if (!atlasMerger.Run(outputTextureWidth, outputTextureHeight, EParameterization(parameterizationMethod), meshOutput, textureOutput))
+    TextureOptimizerV2 textureOptimizer(&mesh, &texture);
+    if (!textureOptimizer.Run(outputTextureWidth, outputTextureHeight, EParameterization(parameterizationMethod), meshOutput, textureOutput))
     {
         Logger::Error("Could not optimize the texture!");
         return 1;

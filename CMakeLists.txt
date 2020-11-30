@@ -15,7 +15,9 @@ ENDIF()
 ADD_DEFINITIONS(-D _USE_MATH_DEFINES)
 ADD_DEFINITIONS(-D _CRT_SECURE_NO_WARNINGS)
 ADD_DEFINITIONS(-D _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS)
+
 ADD_DEFINITIONS(-D NOMINMAX)
+ADD_DEFINITIONS(-D IGL_VIEWER_VIEWER_QUIET)
 
 FIND_PACKAGE(OpenMesh REQUIRED NO_MODULE)
 FIND_PACKAGE(Eigen3 3.3 REQUIRED NO_MODULE)
@@ -67,7 +69,7 @@ SET(SOURCE_FILES
         Sources/Logger.cpp
         Sources/CutToDiskImpl.cpp
         Sources/BarycentricParameterization.cpp
-        Sources/AtlasMerger.cpp
+        Sources/TextureOptimizerV2.cpp
         Sources/MeshUtils.cpp
         Sources/IglDebugViewer.cpp
         Sources/ClusteringAlgorithm.cpp)
