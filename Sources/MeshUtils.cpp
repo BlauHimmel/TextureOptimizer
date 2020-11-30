@@ -353,13 +353,8 @@ bool CutToDisk(TriMesh * pMesh, size_t seedFaceNum)
             progressBar++;
             mutex.unlock();
 
-            TriMesh testMesh(*pMesh);
-            CutToDiskImpl(&testMesh, seedIdxs[i]);
-
-            auto boundaryDistances = MeshBoundaryDistances(&testMesh);
-            if (boundaryDistances.size() != 1) { continue; }
-
-            Real priority = std::pow(boundaryDistances[0], 2.0) / (4.0 * M_PI * totalArea);
+            Real boundaryDistances = CutToDiskSeamLengthImpl(pMesh, seedIdxs[i]);
+            Real priority = std::pow(boundaryDistances, 2.0) / (4.0 * M_PI * totalArea);
 
             if (priority < value.second)
             {
@@ -853,4 +848,13 @@ bool TextureIntegrate(const TriMesh * pOriginMesh, const TriMesh * pNewMesh, Tex
     integratedTexture.CopyTo(pTexture);
 
     return true;
+}
+
+bool IsDiskTopology(const TriMesh * pMesh)
+{
+    int32_t genus = GetMeshGenus(pMesh);
+    int32_t euler = GetMeshEuler(pMesh);
+    size_t comp = MeshComponentCount(pMesh);
+    size_t boundary = MeshBoundaryCount(pMesh);
+    return genus == 0 && euler == 1 && comp == 1 && boundary == 1;
 }

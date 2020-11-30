@@ -34,5 +34,6 @@ void EBPProxy(TriMesh * pMesh);
 
 bool TextureIntegrate(const TriMesh * pOriginMesh, const TriMesh * pNewMesh, Texture * pTexture, uint32_t width, uint32_t height, uint32_t expandRadius = 4);
 
+bool IsDiskTopology(const TriMesh * pMesh);
 
 #endif //MESH_UTILS_HPP

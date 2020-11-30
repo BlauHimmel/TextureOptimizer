@@ -20,13 +20,20 @@ bool TextureOptimizer::Run(uint32_t width, uint32_t height, EParameterization pa
     RepairNonManifold(m_pMesh);
     Logger::Info("<RepairNonManifold> Completed!");
 
-    Logger::Info("Cutting the mesh...");
-    if (!CutToDisk(m_pMesh) || GetMeshGenus(m_pMesh) != 0)
+    if (!IsDiskTopology(m_pMesh))
     {
-        Logger::Error("Cannot cut the mesh into a topological disk.");
-        return false;
+        Logger::Info("Cutting the mesh...");
+        if (!CutToDisk(m_pMesh) || GetMeshGenus(m_pMesh) != 0 || GetMeshEuler(m_pMesh) != 1)
+        {
+            Logger::Error("Cannot cut the mesh into a topological disk.");
+            return false;
+        }
+        Logger::Info("<CutToDisk> Completed!");
     }
-    Logger::Info("<CutToDisk> Completed!");
+    else
+    {
+        Logger::Info("Since mesh is already a topology disk, <CutToDisk> is passed.");
+    }
 
     TriMesh originMesh(*m_pMesh);
     if (pCutMesh != nullptr)

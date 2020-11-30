@@ -5,4 +5,6 @@
 
 void CutToDiskImpl(TriMesh * pMesh, size_t seedIdx = 0);
 
+Real CutToDiskSeamLengthImpl(const TriMesh * pMesh, size_t seedIdx = 0);
+
 #endif //CUT_TO_DISK_IMPL_HPP

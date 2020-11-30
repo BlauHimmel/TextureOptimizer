@@ -11,14 +11,6 @@
 
 const char * MESH_FPROP_ATLAS_INDEX = "atlasIdx";
 
-struct TexCoord2DHasher
-{
-    size_t operator()(const TriMesh::TexCoord2D & uv) const
-    {
-        return std::hash<Real>()(uv[0]) ^ std::hash<Real>()(uv[1]);
-    }
-};
-
 bool AtlasMerger::Run(uint32_t width, uint32_t height, EParameterization parameterization, const std::string & meshOutput, const std::string & textureOutput)
 {
     if (m_pMesh == nullptr || m_pTexture == nullptr || !m_pTexture->IsValid())
@@ -88,13 +80,20 @@ bool AtlasMerger::Run(uint32_t width, uint32_t height, EParameterization paramet
         RepairNonManifold(&subMeshes[i]);
         Logger::Info("<RepairNonManifold> Completed [%zd]!", i);
 
-        Logger::Info("Cutting the submesh [%zd]...", i);
-        if (!CutToDisk(&subMeshes[i]) || GetMeshGenus(&subMeshes[i]) != 0)
+        if (!IsDiskTopology(&subMeshes[i]))
         {
-            Logger::Error("Cannot cut the submesh [%zd] into a topological disk.", i);
-            continue;
+            Logger::Info("Cutting the submesh [%zd]...", i);
+            if (!CutToDisk(&subMeshes[i]) || GetMeshGenus(&subMeshes[i]) != 0 || GetMeshEuler(&subMeshes[i]) != 1)
+            {
+                Logger::Error("Cannot cut the submesh [%zd] into a topological disk.", i);
+                continue;
+            }
+            Logger::Info("<CutToDisk> Completed [%zd]!", i);
         }
-        Logger::Info("<CutToDisk> Completed [%zd]!", i);
+        else
+        {
+            Logger::Info("Since submesh [%zd] is already a topology disk, <CutToDisk> is passed.", i);
+        }
 
         Logger::Info("Parameterizing the submesh [%zd]...", i);
         TriMesh uvMesh(subMeshes[i]);
@@ -187,6 +186,14 @@ bool AtlasMerger::Run(uint32_t width, uint32_t height, EParameterization paramet
 
     return true;
 }
+
+struct TexCoord2DHasher
+{
+    size_t operator()(const TriMesh::TexCoord2D & uv) const
+    {
+        return std::hash<Real>()(uv[0]) ^ std::hash<Real>()(uv[1]);
+    }
+};
 
 std::unique_ptr<AtlasInfo> AtlasMerger::MarkAtlasIndex(TriMesh * pMesh)
 {

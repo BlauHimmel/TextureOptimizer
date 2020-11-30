@@ -7,266 +7,8 @@
 #include "Logger.hpp"
 #include "MeshUtils.hpp"
 
-/* Cut the mesh use 'cuts'. */
-static void CutMesh(TriMesh * pMesh, const std::vector<std::vector<int>> & cuts)
-{
-    /* Store the indices of the cycle's halfedge handle */
-    std::vector<int> cycleHalfedgedIdxs;
-
-    for (auto & cut : cuts)
-    {
-        for (int j = 1; j < cut.size(); j++)
-        {
-            const auto vh = TriMesh::VertexHandle(cut[j]);
-            const auto vhAdjacent = TriMesh::VertexHandle(cut[j - 1]);
-
-            const auto heh0 = pMesh->find_halfedge(vh, vhAdjacent);
-            const auto heh1 = pMesh->find_halfedge(vhAdjacent, vh);
-
-            if (heh0 != TriMesh::InvalidHalfedgeHandle)
-            {
-                cycleHalfedgedIdxs.push_back(heh0.idx());
-            }
-
-            if (heh1 != TriMesh::InvalidHalfedgeHandle)
-            {
-                cycleHalfedgedIdxs.push_back(heh1.idx());
-            }
-        }
-    }
-
-    /* Store the indices of the cycle's inner halfedge handle */
-    std::vector<int> cycleInnerHalfedgedIdxs;
-
-    /* We first find the start halfedge point */
-    auto startHEH = TriMesh::HalfedgeHandle(cycleHalfedgedIdxs[0]);
-    auto currentHEH = startHEH;
-
-    bool bIsInnerHEH = true;
-
-    do
-    {
-        if (pMesh->is_boundary(currentHEH))
-        {
-            bIsInnerHEH = false;
-            break;
-        }
-
-        currentHEH = pMesh->next_halfedge_handle(currentHEH);
-
-        while (std::find(cycleHalfedgedIdxs.begin(), cycleHalfedgedIdxs.end(), currentHEH.idx()) == cycleHalfedgedIdxs.end())
-        {
-            currentHEH = pMesh->opposite_halfedge_handle(currentHEH);
-            currentHEH = pMesh->next_halfedge_handle(currentHEH);
-        }
-
-    } while (currentHEH != startHEH);
-
-    if (!bIsInnerHEH)
-    {
-        startHEH = pMesh->opposite_halfedge_handle(startHEH);
-    }
-
-    currentHEH = startHEH;
-
-    /* Then push the inner halfedges handles into the vector */
-    do
-    {
-        cycleInnerHalfedgedIdxs.push_back(currentHEH.idx());
-        currentHEH = pMesh->next_halfedge_handle(currentHEH);
-
-        while (std::find(cycleHalfedgedIdxs.begin(), cycleHalfedgedIdxs.end(), currentHEH.idx()) == cycleHalfedgedIdxs.end())
-        {
-            currentHEH = pMesh->opposite_halfedge_handle(currentHEH);
-            currentHEH = pMesh->next_halfedge_handle(currentHEH);
-        }
-
-    } while (currentHEH != startHEH);
-
-    /* Key is the index of face handle and the old vertex handle in it, value
-    is the index of new vertex handle. fhOldNewVhIdxPairs[Pair(FH, OldVH)] tell
-    us that at face 'FH', vertex 'OldVH' need to be replaced by the search result
-    (if had) */
-    std::map<std::pair<int, int>, int> fhOldNewVhIdxPairs;
-
-    /* Store the indices of updated faces' vertex handle (F0-VH0, F0-VH1,
-    F0-VH2, F1-VH0, F1-VH1, F1-VH2....). We first store the old vertex
-    handle and then use 'fhOldNewVhIdxPairs' to update the vector. */
-    std::vector<int> newFacetsVhIdxs;
-
-    /* Store the indices of the face handle that are to be updated*/
-    std::vector<int> updatedFacetIdxs;
-
-    for (int i = 0; i < cycleInnerHalfedgedIdxs.size(); i++)
-    {
-        auto heh = TriMesh::HalfedgeHandle(cycleInnerHalfedgedIdxs[i]);
-
-        const auto oldVh = pMesh->from_vertex_handle(heh);
-        const auto oldPoint = pMesh->point(oldVh);
-
-        const auto newVH = pMesh->add_vertex(oldPoint);
-
-        if (pMesh->has_vertex_texcoords2D())
-        {
-            const auto oldTexcoord = pMesh->texcoord2D(oldVh);
-            pMesh->set_texcoord2D(newVH, oldTexcoord);
-        }
-
-        heh = pMesh->prev_halfedge_handle(heh);
-
-        do
-        {
-            auto fh = pMesh->face_handle(heh);
-            auto fvIter = pMesh->fv_range(fh).begin();
-            auto fvIterEnd = pMesh->fv_range(fh).end();
-
-            auto vh0 = *fvIter; fvIter++;
-            auto vh1 = *fvIter; fvIter++;
-            auto vh2 = *fvIter; fvIter++;
-
-#ifdef _DEBUG
-            if (fvIter != fvIterEnd)
-            {
-                Logger::Test("Non triangle facet found while cutting the mesh to disk.");
-                throw std::runtime_error("Non triangle facet found while cutting the mesh to disk.");
-            }
-#endif
-            fhOldNewVhIdxPairs.insert({{fh.idx(), oldVh.idx() }, newVH.idx() });
-            newFacetsVhIdxs.insert(newFacetsVhIdxs.end(), {vh0.idx(), vh1.idx(), vh2.idx() });
-            updatedFacetIdxs.push_back(fh.idx());
-
-            const auto hehOpposite = pMesh->opposite_halfedge_handle(heh);
-            if (std::find(cycleInnerHalfedgedIdxs.begin(), cycleInnerHalfedgedIdxs.end(), hehOpposite.idx()) != cycleInnerHalfedgedIdxs.end())
-            {
-                break;
-            }
-
-            heh = pMesh->prev_halfedge_handle(hehOpposite);
-            if (std::find(cycleInnerHalfedgedIdxs.begin(), cycleInnerHalfedgedIdxs.end(), heh.idx()) != cycleInnerHalfedgedIdxs.end())
-            {
-                break;
-            }
-
-        } while (!pMesh->is_boundary(heh));
-
-        if (!pMesh->is_boundary(heh))
-        {
-            fhOldNewVhIdxPairs.insert({{pMesh->face_handle(heh).idx(), oldVh.idx() }, newVH.idx() });
-        }
-    }
-
-    /* Using 'fhOldNewVhIdxPairs' and 'updatedFacetIdxs' to update 'newFacetsVhIdxs' */
-    for (int i = 0; i < updatedFacetIdxs.size(); i++)
-    {
-        auto fhIdx = updatedFacetIdxs[i];
-
-        auto & vh0Idx = newFacetsVhIdxs[i * 3 + 0];
-        auto & vh1Idx = newFacetsVhIdxs[i * 3 + 1];
-        auto & vh2Idx = newFacetsVhIdxs[i * 3 + 2];
-
-        auto findIter0 = fhOldNewVhIdxPairs.find({fhIdx, vh0Idx });
-        auto findIter1 = fhOldNewVhIdxPairs.find({fhIdx, vh1Idx });
-        auto findIter2 = fhOldNewVhIdxPairs.find({fhIdx, vh2Idx });
-
-        if (findIter0 != fhOldNewVhIdxPairs.end()) { vh0Idx = findIter0->second; }
-        if (findIter1 != fhOldNewVhIdxPairs.end()) { vh1Idx = findIter1->second; }
-        if (findIter2 != fhOldNewVhIdxPairs.end()) { vh2Idx = findIter2->second; }
-    }
-
-    /* Create the new mesh. */
-    TriMesh newMesh;
-    std::vector<TriMesh::VertexHandle> newMeshVHs;
-    std::vector<std::vector<TriMesh::VertexHandle>> newMeshFacetsVHs;
-
-    if (pMesh->has_vertex_texcoords2D())
-    {
-        newMesh.request_vertex_texcoords2D();
-    }
-
-    if (pMesh->has_halfedge_texcoords2D())
-    {
-        newMesh.request_halfedge_texcoords2D();
-    }
-
-    /* Move the vertex handle to the new mesh */
-    for (int i = 0; i < pMesh->n_vertices(); i++)
-    {
-        const auto oriVH = TriMesh::VertexHandle(i);
-        const auto point = pMesh->point(oriVH);
-        const auto newVH = newMesh.add_vertex(point);
-
-        if (pMesh->has_vertex_texcoords2D())
-        {
-            const auto & texcoord = pMesh->texcoord2D(oriVH);
-            newMesh.set_texcoord2D(newVH, texcoord);
-        }
-
-        newMeshVHs.push_back(newVH);
-    }
-
-    /* If the face need to be updated, we use the vertex handle store in 'newFacetsVhIdxs',
-    otherwise we just use the old vertex handle */
-    for (int i = 0; i < pMesh->n_faces(); i++)
-    {
-        const auto originFH = TriMesh::FaceHandle(i);
-        const auto iter = std::find(updatedFacetIdxs.begin(), updatedFacetIdxs.end(), originFH.idx());
-
-        TriMesh::VertexHandle vh0, vh1, vh2;
-
-        if (iter != updatedFacetIdxs.end())
-        {
-            const auto idx = iter - updatedFacetIdxs.begin();
-            vh0 = TriMesh::VertexHandle(newFacetsVhIdxs[idx * 3 + 0]);
-            vh1 = TriMesh::VertexHandle(newFacetsVhIdxs[idx * 3 + 1]);
-            vh2 = TriMesh::VertexHandle(newFacetsVhIdxs[idx * 3 + 2]);
-        }
-        else
-        {
-            auto fvIter = pMesh->fv_range(originFH).begin();
-            auto fvIterEnd = pMesh->fv_range(originFH).end();
-
-            vh0 = *fvIter; fvIter++;
-            vh1 = *fvIter; fvIter++;
-            vh2 = *fvIter; fvIter++;
-        }
-
-        std::vector<TriMesh::VertexHandle> newMeshFacetVHs = {vh0, vh1, vh2 };
-        const auto newFH = newMesh.add_face(newMeshFacetVHs);
-        newMeshFacetsVHs.push_back(newMeshFacetVHs);
-
-        if (pMesh->has_halfedge_texcoords2D())
-        {
-            for (auto originHEH : pMesh->fh_range(originFH))
-            {
-                auto originToVH = pMesh->to_vertex_handle(originHEH);
-
-                for (auto newHEH : newMesh.fh_range(newFH))
-                {
-                    auto newToVH = newMesh.to_vertex_handle(newHEH);
-
-                    auto newToPoint = newMesh.point(newToVH);
-                    auto originToPoint = pMesh->point(originToVH);
-
-                    if (newToPoint == originToPoint)
-                    {
-                        const auto & texcoord = pMesh->texcoord2D(originHEH);
-                        newMesh.set_texcoord2D(newHEH, texcoord);
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    /* Delete the useless vertex. */
-    *pMesh = newMesh;
-    pMesh->request_vertex_status();
-    pMesh->delete_isolated_vertices();
-    pMesh->garbage_collection();
-    pMesh->release_vertex_status();
-}
-
-void CutToDiskImpl(TriMesh * pMesh, size_t seedIdx)
+/* Compute the 'cuts' seam */
+static std::vector<std::vector<int>> ComputeCut(const TriMesh * pMesh, size_t seedIdx)
 {
     int faceNumber = static_cast<int>(pMesh->n_faces());
     int edgeNumber = static_cast<int>(pMesh->n_edges());
@@ -275,13 +17,13 @@ void CutToDiskImpl(TriMesh * pMesh, size_t seedIdx)
     if (faceNumber == 0 || edgeNumber == 0 || vertexNumber == 0)
     {
         Logger::Warn("You tried to cut an empty mesh to disk, nothing happen.");
-        return;
+        return std::vector<std::vector<int>>();
     }
 
     if (seedIdx >= faceNumber)
     {
         Logger::Warn("Invalid index of seed face, nothing happen.");
-        return;
+        return std::vector<std::vector<int>>();
     }
 
     /* facet(i, j) : index of the j-th vertex at i-th triangle */
@@ -604,7 +346,7 @@ void CutToDiskImpl(TriMesh * pMesh, size_t seedIdx)
     if (loopEdgeNumber == 0)
     {
         Logger::Warn("The number of the edges that are on boundary is zero.");
-        return;
+        return std::vector<std::vector<int>>();
     }
 
     /* Key is the index of boundary edges' vertex in 'facets', value is the boundary
@@ -782,5 +524,307 @@ void CutToDiskImpl(TriMesh * pMesh, size_t seedIdx)
         }
     }
 
+    return cuts;
+}
+
+/* Cut the mesh use 'cuts'. */
+static void CutMesh(TriMesh * pMesh, const std::vector<std::vector<int>> & cuts)
+{
+    /* Store the indices of the cycle's halfedge handle */
+    std::vector<int> cycleHalfedgedIdxs;
+
+    for (auto & cut : cuts)
+    {
+        for (int j = 1; j < cut.size(); j++)
+        {
+            const auto vh = TriMesh::VertexHandle(cut[j]);
+            const auto vhAdjacent = TriMesh::VertexHandle(cut[j - 1]);
+
+            const auto heh0 = pMesh->find_halfedge(vh, vhAdjacent);
+            const auto heh1 = pMesh->opposite_halfedge_handle(heh0);
+
+            if (heh0 != TriMesh::InvalidHalfedgeHandle)
+            {
+                cycleHalfedgedIdxs.push_back(heh0.idx());
+            }
+
+            if (heh1 != TriMesh::InvalidHalfedgeHandle)
+            {
+                cycleHalfedgedIdxs.push_back(heh1.idx());
+            }
+        }
+    }
+
+    /* Store the indices of the cycle's inner halfedge handle */
+    std::vector<int> cycleInnerHalfedgedIdxs;
+
+    /* We first find the start halfedge point */
+    auto startHEH = TriMesh::HalfedgeHandle(cycleHalfedgedIdxs[0]);
+    auto currentHEH = startHEH;
+
+    bool bIsInnerHEH = true;
+
+    do
+    {
+        if (pMesh->is_boundary(currentHEH))
+        {
+            bIsInnerHEH = false;
+            break;
+        }
+
+        currentHEH = pMesh->next_halfedge_handle(currentHEH);
+
+        while (std::find(cycleHalfedgedIdxs.begin(), cycleHalfedgedIdxs.end(), currentHEH.idx()) == cycleHalfedgedIdxs.end())
+        {
+            currentHEH = pMesh->opposite_halfedge_handle(currentHEH);
+            currentHEH = pMesh->next_halfedge_handle(currentHEH);
+        }
+
+    } while (currentHEH != startHEH);
+
+    if (!bIsInnerHEH)
+    {
+        startHEH = pMesh->opposite_halfedge_handle(startHEH);
+    }
+
+    currentHEH = startHEH;
+
+    /* Then push the inner halfedges handles into the vector */
+    do
+    {
+        cycleInnerHalfedgedIdxs.push_back(currentHEH.idx());
+        currentHEH = pMesh->next_halfedge_handle(currentHEH);
+
+        while (std::find(cycleHalfedgedIdxs.begin(), cycleHalfedgedIdxs.end(), currentHEH.idx()) == cycleHalfedgedIdxs.end())
+        {
+            currentHEH = pMesh->opposite_halfedge_handle(currentHEH);
+            currentHEH = pMesh->next_halfedge_handle(currentHEH);
+        }
+
+    } while (currentHEH != startHEH);
+
+    /* Key is the index of face handle and the old vertex handle in it, value
+    is the index of new vertex handle. fhOldNewVhIdxPairs[Pair(FH, OldVH)] tell
+    us that at face 'FH', vertex 'OldVH' need to be replaced by the search result
+    (if had) */
+    std::map<std::pair<int, int>, int> fhOldNewVhIdxPairs;
+
+    /* Store the indices of updated faces' vertex handle (F0-VH0, F0-VH1,
+    F0-VH2, F1-VH0, F1-VH1, F1-VH2....). We first store the old vertex
+    handle and then use 'fhOldNewVhIdxPairs' to update the vector. */
+    std::vector<int> newFacetsVhIdxs;
+
+    /* Store the indices of the face handle that are to be updated*/
+    std::vector<int> updatedFacetIdxs;
+
+    for (int i = 0; i < cycleInnerHalfedgedIdxs.size(); i++)
+    {
+        auto heh = TriMesh::HalfedgeHandle(cycleInnerHalfedgedIdxs[i]);
+
+        const auto oldVh = pMesh->from_vertex_handle(heh);
+        const auto oldPoint = pMesh->point(oldVh);
+
+        const auto newVH = pMesh->add_vertex(oldPoint);
+
+        if (pMesh->has_vertex_texcoords2D())
+        {
+            const auto oldTexcoord = pMesh->texcoord2D(oldVh);
+            pMesh->set_texcoord2D(newVH, oldTexcoord);
+        }
+
+        heh = pMesh->prev_halfedge_handle(heh);
+
+        do
+        {
+            auto fh = pMesh->face_handle(heh);
+            auto fvIter = pMesh->fv_range(fh).begin();
+            auto fvIterEnd = pMesh->fv_range(fh).end();
+
+            auto vh0 = *fvIter; fvIter++;
+            auto vh1 = *fvIter; fvIter++;
+            auto vh2 = *fvIter; fvIter++;
+
+#ifdef _DEBUG
+            if (fvIter != fvIterEnd)
+            {
+                Logger::Test("Non triangle facet found while cutting the mesh to disk.");
+                throw std::runtime_error("Non triangle facet found while cutting the mesh to disk.");
+            }
+#endif
+            fhOldNewVhIdxPairs.insert({{fh.idx(), oldVh.idx() }, newVH.idx() });
+            newFacetsVhIdxs.insert(newFacetsVhIdxs.end(), {vh0.idx(), vh1.idx(), vh2.idx() });
+            updatedFacetIdxs.push_back(fh.idx());
+
+            const auto hehOpposite = pMesh->opposite_halfedge_handle(heh);
+            if (std::find(cycleInnerHalfedgedIdxs.begin(), cycleInnerHalfedgedIdxs.end(), hehOpposite.idx()) != cycleInnerHalfedgedIdxs.end())
+            {
+                break;
+            }
+
+            heh = pMesh->prev_halfedge_handle(hehOpposite);
+            if (std::find(cycleInnerHalfedgedIdxs.begin(), cycleInnerHalfedgedIdxs.end(), heh.idx()) != cycleInnerHalfedgedIdxs.end())
+            {
+                break;
+            }
+
+        } while (!pMesh->is_boundary(heh));
+
+        if (!pMesh->is_boundary(heh))
+        {
+            fhOldNewVhIdxPairs.insert({{pMesh->face_handle(heh).idx(), oldVh.idx() }, newVH.idx() });
+        }
+    }
+
+    /* Using 'fhOldNewVhIdxPairs' and 'updatedFacetIdxs' to update 'newFacetsVhIdxs' */
+    for (int i = 0; i < updatedFacetIdxs.size(); i++)
+    {
+        auto fhIdx = updatedFacetIdxs[i];
+
+        auto & vh0Idx = newFacetsVhIdxs[i * 3 + 0];
+        auto & vh1Idx = newFacetsVhIdxs[i * 3 + 1];
+        auto & vh2Idx = newFacetsVhIdxs[i * 3 + 2];
+
+        auto findIter0 = fhOldNewVhIdxPairs.find({fhIdx, vh0Idx });
+        auto findIter1 = fhOldNewVhIdxPairs.find({fhIdx, vh1Idx });
+        auto findIter2 = fhOldNewVhIdxPairs.find({fhIdx, vh2Idx });
+
+        if (findIter0 != fhOldNewVhIdxPairs.end()) { vh0Idx = findIter0->second; }
+        if (findIter1 != fhOldNewVhIdxPairs.end()) { vh1Idx = findIter1->second; }
+        if (findIter2 != fhOldNewVhIdxPairs.end()) { vh2Idx = findIter2->second; }
+    }
+
+    /* Create the new mesh. */
+    TriMesh newMesh;
+    std::vector<TriMesh::VertexHandle> newMeshVHs;
+    std::vector<std::vector<TriMesh::VertexHandle>> newMeshFacetsVHs;
+
+    if (pMesh->has_vertex_texcoords2D())
+    {
+        newMesh.request_vertex_texcoords2D();
+    }
+
+    if (pMesh->has_halfedge_texcoords2D())
+    {
+        newMesh.request_halfedge_texcoords2D();
+    }
+
+    /* Move the vertex handle to the new mesh */
+    for (int i = 0; i < pMesh->n_vertices(); i++)
+    {
+        const auto oriVH = TriMesh::VertexHandle(i);
+        const auto point = pMesh->point(oriVH);
+        const auto newVH = newMesh.add_vertex(point);
+
+        if (pMesh->has_vertex_texcoords2D())
+        {
+            const auto & texcoord = pMesh->texcoord2D(oriVH);
+            newMesh.set_texcoord2D(newVH, texcoord);
+        }
+
+        newMeshVHs.push_back(newVH);
+    }
+
+    /* If the face need to be updated, we use the vertex handle store in 'newFacetsVhIdxs',
+    otherwise we just use the old vertex handle */
+    for (int i = 0; i < pMesh->n_faces(); i++)
+    {
+        const auto originFH = TriMesh::FaceHandle(i);
+        const auto iter = std::find(updatedFacetIdxs.begin(), updatedFacetIdxs.end(), originFH.idx());
+
+        TriMesh::VertexHandle vh0, vh1, vh2;
+
+        if (iter != updatedFacetIdxs.end())
+        {
+            const auto idx = iter - updatedFacetIdxs.begin();
+            vh0 = TriMesh::VertexHandle(newFacetsVhIdxs[idx * 3 + 0]);
+            vh1 = TriMesh::VertexHandle(newFacetsVhIdxs[idx * 3 + 1]);
+            vh2 = TriMesh::VertexHandle(newFacetsVhIdxs[idx * 3 + 2]);
+        }
+        else
+        {
+            auto fvIter = pMesh->fv_range(originFH).begin();
+            auto fvIterEnd = pMesh->fv_range(originFH).end();
+
+            vh0 = *fvIter; fvIter++;
+            vh1 = *fvIter; fvIter++;
+            vh2 = *fvIter; fvIter++;
+        }
+
+        std::vector<TriMesh::VertexHandle> newMeshFacetVHs = {vh0, vh1, vh2 };
+        const auto newFH = newMesh.add_face(newMeshFacetVHs);
+        newMeshFacetsVHs.push_back(newMeshFacetVHs);
+
+        if (pMesh->has_halfedge_texcoords2D())
+        {
+            for (auto originHEH : pMesh->fh_range(originFH))
+            {
+                auto originToVH = pMesh->to_vertex_handle(originHEH);
+
+                for (auto newHEH : newMesh.fh_range(newFH))
+                {
+                    auto newToVH = newMesh.to_vertex_handle(newHEH);
+
+                    auto newToPoint = newMesh.point(newToVH);
+                    auto originToPoint = pMesh->point(originToVH);
+
+                    if (newToPoint == originToPoint)
+                    {
+                        const auto & texcoord = pMesh->texcoord2D(originHEH);
+                        newMesh.set_texcoord2D(newHEH, texcoord);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    /* Delete the useless vertex. */
+    *pMesh = newMesh;
+    pMesh->request_vertex_status();
+    pMesh->delete_isolated_vertices();
+    pMesh->garbage_collection();
+    pMesh->release_vertex_status();
+}
+
+void CutToDiskImpl(TriMesh * pMesh, size_t seedIdx)
+{
+    std::vector<std::vector<int>> cuts = ComputeCut(pMesh, seedIdx);
     CutMesh(pMesh, cuts);
+}
+
+double CutToDiskSeamLengthImpl(const TriMesh * pMesh, size_t seedIdx)
+{
+    std::vector<std::vector<int>> cuts = ComputeCut(pMesh, seedIdx);
+
+    Real seamLength = 0.0;
+    for (auto & cut : cuts)
+    {
+        for (int j = 1; j < cut.size(); j++)
+        {
+            const auto vh = TriMesh::VertexHandle(cut[j]);
+            const auto vhAdjacent = TriMesh::VertexHandle(cut[j - 1]);
+
+            const auto heh = pMesh->find_halfedge(vh, vhAdjacent);
+
+            if (heh == TriMesh::InvalidHalfedgeHandle)
+            {
+                continue;
+            }
+
+            const auto eh = pMesh->edge_handle(heh);
+            Real edgeLength = pMesh->calc_edge_length(eh);
+
+            if (pMesh->is_boundary(eh))
+            {
+                seamLength += edgeLength;
+            }
+            else
+            {
+                seamLength += 2.0 * edgeLength;
+            }
+
+        }
+    }
+
+    return seamLength;
 }
