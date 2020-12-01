@@ -29,7 +29,7 @@ private:
     static size_t MergeAtlas(TriMesh * pMesh, AtlasInfo * pAtlasInfo);
     static std::unique_ptr<AtlasInfo> MeshClustering(TriMesh * pMesh);
     static std::unique_ptr<TriMesh[]> CreateSubMeshFromAtlas(const TriMesh * pMesh, AtlasInfo * pAtlasInfo);
-    static bool MergeResultAndWrite(const TriMesh * pMeshes, const Texture * pTextures, size_t clusterNum,
+    static bool MergeResultAndWrite(const TriMesh * pMeshes, const Texture * pTextures, const Real * pSizeCoeffs, size_t clusterNum,
         uint32_t mergedTextureWidth, uint32_t mergedTextureHeight, uint32_t mergedTextureChannels,
         const std::string & meshOutput, const std::string & textureOutput);
 
