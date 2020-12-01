@@ -444,7 +444,7 @@ bool MeshUVTransfer(TriMesh * pMesh, const TriMesh * pUVMesh)
     return true;
 }
 
-void SLIMProxy(TriMesh * pMesh)
+void SLIMProxy(TriMesh * pMesh, Real * pWidth, Real * pHeith)
 {
     int faceNumber = static_cast<int>(pMesh->n_faces());
     int vertexNumber =  static_cast<int>(pMesh->n_vertices());
@@ -532,6 +532,7 @@ void SLIMProxy(TriMesh * pMesh)
         yMax = std::max(yMax, point[1]);
     }
 
+    Real invDelta = 1.0 / std::max(xMax - xMin, yMax - yMin);
     Real invDeltaX = 1.0 / (xMax - xMin);
     Real invDeltaY = 1.0 / (yMax - yMin);
 
@@ -542,9 +543,19 @@ void SLIMProxy(TriMesh * pMesh)
         point[0] = (point[0] - xMin) * invDeltaX;
         point[1] = (point[1] - yMin) * invDeltaY;
     }
+
+    if (pWidth != nullptr)
+    {
+        *pWidth = (xMax - xMin) * invDelta;
+    }
+
+    if (pHeith != nullptr)
+    {
+        *pHeith = (yMax - yMin) * invDelta;
+    }
 }
 
-void EBPProxy(TriMesh * pMesh)
+void EBPProxy(TriMesh * pMesh, Real * pWidth, Real * pHeith)
 {
     int faceNumber = static_cast<int>(pMesh->n_faces());
     int vertexNumber =  static_cast<int>(pMesh->n_vertices());
@@ -611,6 +622,7 @@ void EBPProxy(TriMesh * pMesh)
         yMax = std::max(yMax, point[1]);
     }
 
+    Real invDelta = 1.0 / std::max(xMax - xMin, yMax - yMin);
     Real invDeltaX = 1.0 / (xMax - xMin);
     Real invDeltaY = 1.0 / (yMax - yMin);
 
@@ -620,6 +632,16 @@ void EBPProxy(TriMesh * pMesh)
         auto & point = pMesh->point(vh);
         point[0] = (point[0] - xMin) * invDeltaX;
         point[1] = (point[1] - yMin) * invDeltaY;
+    }
+
+    if (pWidth != nullptr)
+    {
+        *pWidth = (xMax - xMin) * invDelta;
+    }
+
+    if (pHeith != nullptr)
+    {
+        *pHeith = (yMax - yMin) * invDelta;
     }
 }
 
@@ -804,7 +826,7 @@ bool TextureIntegrate(const TriMesh * pOriginMesh, const TriMesh * pNewMesh, Tex
     {
         for (uint32_t y = range.begin(); y != range.end(); y++)
         {
-            for (uint32_t x = 0; x < targetHeight; x++)
+            for (uint32_t x = 0; x < targetWidth; x++)
             {
                 if (flag[y][x] == BLANK)
                 {
@@ -849,7 +871,7 @@ bool TextureIntegrate(const TriMesh * pOriginMesh, const TriMesh * pNewMesh, Tex
         }
     };
 
-    tbb::blocked_range<uint32_t> ExpandRange(0u, targetWidth);
+    tbb::blocked_range<uint32_t> ExpandRange(0u, targetHeight);
     tbb::parallel_for(ExpandRange, ExpandKernel);
 
     integratedTexture.CopyTo(pTexture);

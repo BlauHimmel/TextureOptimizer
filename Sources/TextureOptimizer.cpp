@@ -43,18 +43,18 @@ bool TextureOptimizer::Run(uint32_t width, uint32_t height, EParameterization pa
 
     Logger::Info("Parameterizing the mesh...");
     TriMesh uvMesh(*m_pMesh);
-
+    Real uvWidth = 1.0, uvHeight = 1.0;
     if (parameterization == EParameterization::EBarycentric)
     {
         BarycentricMapping(uvMesh, EBoundary::Square, EBoundaryFixWeight::Length, ECoefficient::DiscreteHarmonic);
     }
     else if (parameterization == EParameterization::ESLIM)
     {
-        SLIMProxy(&uvMesh);
+        SLIMProxy(&uvMesh, &uvWidth, &uvHeight);
     }
     else if (parameterization == EParameterization::EEBP)
     {
-        EBPProxy(&uvMesh);
+        EBPProxy(&uvMesh, &uvWidth, &uvHeight);
     }
     else
     {
@@ -72,7 +72,9 @@ bool TextureOptimizer::Run(uint32_t width, uint32_t height, EParameterization pa
     Logger::Info("<MeshUVTransfer> Completed!");
 
     Logger::Info("Integrating the texture...");
-    if (!TextureIntegrate(&originMesh, m_pMesh, m_pTexture, width, height))
+    auto integratedWidth = static_cast<uint32_t>((width == uint32_t(-1) ? m_pTexture->Width() : width) * uvWidth);
+    auto integratedHeight = static_cast<uint32_t>((height == uint32_t(-1) ? m_pTexture->Height() : height) * uvHeight);
+    if (!TextureIntegrate(&originMesh, m_pMesh, m_pTexture, integratedWidth, integratedHeight))
     {
         Logger::Error("Error occurred when integrating the texture.");
         return false;

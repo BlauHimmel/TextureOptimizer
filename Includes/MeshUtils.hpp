@@ -29,8 +29,8 @@ int32_t GetMeshGenus(const TriMesh * pMesh);
 
 bool MeshUVTransfer(TriMesh * pMesh, const TriMesh * pUVMesh);
 
-void SLIMProxy(TriMesh * pMesh);
-void EBPProxy(TriMesh * pMesh);
+void SLIMProxy(TriMesh * pMesh, Real * pWidth = nullptr, Real * pHeith = nullptr);
+void EBPProxy(TriMesh * pMesh, Real * pWidth = nullptr, Real * pHeith = nullptr);
 
 bool TextureIntegrate(const TriMesh * pOriginMesh, const TriMesh * pNewMesh, Texture * pTexture, uint32_t width, uint32_t height, uint32_t expandRadius = 4);
 

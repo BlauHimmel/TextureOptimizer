@@ -25,13 +25,13 @@ public:
     bool Run(uint32_t width, uint32_t height, EParameterization parameterization, const std::string & meshOutput, const std::string & textureOutput);
 
 private:
-    static std::unique_ptr<AtlasInfo> MarkAtlasIndex(TriMesh * pMesh);
-    static size_t MergeAtlas(TriMesh * pMesh, AtlasInfo * pAtlasInfo);
+    [[maybe_unused]] static std::unique_ptr<AtlasInfo> MarkAtlasIndex(TriMesh * pMesh);
+    [[maybe_unused]] static size_t MergeAtlas(TriMesh * pMesh, AtlasInfo * pAtlasInfo);
     static std::unique_ptr<AtlasInfo> MeshClustering(TriMesh * pMesh);
     static std::unique_ptr<TriMesh[]> CreateSubMeshFromAtlas(const TriMesh * pMesh, AtlasInfo * pAtlasInfo);
-    static bool MergeResultAndWrite(const TriMesh * pMeshes, const Texture * pTextures, const Real * pSizeCoeffs, size_t clusterNum,
-        uint32_t mergedTextureWidth, uint32_t mergedTextureHeight, uint32_t mergedTextureChannels,
-        const std::string & meshOutput, const std::string & textureOutput);
+    static bool MergeResultAndWrite(const TriMesh * pMeshes, const Texture * pTextures, const Real * pSizeCoeffs,
+        const Real * uvWidths, const Real * uvHeights, size_t clusterNum, uint32_t mergedTextureWidth, uint32_t mergedTextureHeight,
+        uint32_t mergedTextureChannels, const std::string & meshOutput, const std::string & textureOutput);
 
 private:
     static void MergeAtlasInfoAndFProperty(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, size_t source, size_t target);

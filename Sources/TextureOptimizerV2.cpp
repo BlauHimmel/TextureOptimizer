@@ -68,6 +68,8 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
     std::vector<Real> subMeshAreas(atlasInfo->atlasNum, 0);
     std::vector<Real> sizeCoeffs(atlasInfo->atlasNum, 0);
     Real maxSubMeshArea = 0.0;
+    std::vector<Real> uvWidths(atlasInfo->atlasNum, 1);
+    std::vector<Real> uvHeights(atlasInfo->atlasNum, 1);
 
     for (size_t i = 0; i < atlasInfo->atlasNum; i++)
     {
@@ -123,11 +125,11 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
         }
         else if (parameterization == EParameterization::ESLIM)
         {
-            SLIMProxy(&uvMesh);
+            SLIMProxy(&uvMesh, &uvWidths[i], &uvHeights[i]);
         }
         else if (parameterization == EParameterization::EEBP)
         {
-            EBPProxy(&uvMesh);
+            EBPProxy(&uvMesh, &uvWidths[i], &uvHeights[i]);
         }
         else
         {
@@ -146,8 +148,8 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
 
         Logger::Info("Integrating the subtexture [%zd]...", i);
 
-        auto integratedWidth = static_cast<uint32_t>((width == uint32_t(-1) ? subTextures[i].Width() : width) * sizeCoeffs[i]);
-        auto integratedHeight = static_cast<uint32_t>((height == uint32_t(-1) ? subTextures[i].Height() : height) * sizeCoeffs[i]);
+        auto integratedWidth = static_cast<uint32_t>((width == uint32_t(-1) ? subTextures[i].Width() : width) * sizeCoeffs[i] * uvWidths[i]);
+        auto integratedHeight = static_cast<uint32_t>((height == uint32_t(-1) ? subTextures[i].Height() : height) * sizeCoeffs[i] * uvHeights[i]);
 
         if (!TextureIntegrate(&originMesh, &subMeshes[i], &subTextures[i], integratedWidth, integratedHeight))
         {
@@ -199,8 +201,8 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
     }
 
     Logger::Info("Merging submeshes and textures...");
-    if (!MergeResultAndWrite(subMeshes.get(), subTextures.get(), sizeCoeffs.data(), atlasInfo->atlasNum,
-        mergedTextureWidth, mergedTextureHeight, mergedTextureChannels, mergedMeshOutput, mergedTextureOutput))
+    if (!MergeResultAndWrite(subMeshes.get(), subTextures.get(), sizeCoeffs.data(), uvWidths.data(), uvHeights.data(),
+        atlasInfo->atlasNum, mergedTextureWidth, mergedTextureHeight, mergedTextureChannels, mergedMeshOutput, mergedTextureOutput))
     {
         Logger::Error("Error occurred when merging submeshes and textures.");
         return false;
@@ -730,11 +732,11 @@ std::unique_ptr<TriMesh[]> TextureOptimizerV2::CreateSubMeshFromAtlas(const TriM
     return subMeshes;
 }
 
-bool TextureOptimizerV2::MergeResultAndWrite(const TriMesh * pMeshes, const Texture * pTextures, const Real * pSizeCoeffs, size_t clusterNum,
-    uint32_t mergedTextureWidth, uint32_t mergedTextureHeight, uint32_t mergedTextureChannels,
-    const std::string & meshOutput, const std::string & textureOutput)
+bool TextureOptimizerV2::MergeResultAndWrite(const TriMesh * pMeshes, const Texture * pTextures, const Real * pSizeCoeffs,
+    const Real * uvWidths, const Real * uvHeights, size_t clusterNum, uint32_t mergedTextureWidth, uint32_t mergedTextureHeight,
+    uint32_t mergedTextureChannels, const std::string & meshOutput, const std::string & textureOutput)
 {
-    if (pMeshes == nullptr || pTextures == nullptr || pSizeCoeffs == nullptr || clusterNum == 0)
+    if (pMeshes == nullptr || pTextures == nullptr || pSizeCoeffs == nullptr || uvWidths == nullptr || uvHeights == nullptr || clusterNum == 0)
     {
         return false;
     }
@@ -797,8 +799,8 @@ bool TextureOptimizerV2::MergeResultAndWrite(const TriMesh * pMeshes, const Text
             {
                 const auto vh = mergedMesh.to_vertex_handle(heh);
                 auto uv = vhUVMap[vh.idx()];
-                uv[0] = (uv[0] * pSizeCoeffs[i] + static_cast<Real>(i % atlasStride)) / static_cast<Real>(atlasStride);
-                uv[1] = (uv[1] * pSizeCoeffs[i] + static_cast<Real>(static_cast<int>(i / atlasStride))) / static_cast<Real>(atlasStride);
+                uv[0] = (uv[0] * pSizeCoeffs[i] * uvWidths[i] + static_cast<Real>(i % atlasStride)) / static_cast<Real>(atlasStride);
+                uv[1] = (uv[1] * pSizeCoeffs[i] * uvHeights[i] + static_cast<Real>(static_cast<int>(i / atlasStride))) / static_cast<Real>(atlasStride);
                 mergedMesh.set_texcoord2D(heh, uv);
             }
         }
@@ -818,8 +820,8 @@ bool TextureOptimizerV2::MergeResultAndWrite(const TriMesh * pMeshes, const Text
         uint32_t baseX = mergedTextureStrideX * (i % atlasStride);
         uint32_t baseY = mergedTextureStrideY * (atlasStride - 1 - i / atlasStride);
 
-        auto actualStrideY = static_cast<uint32_t>(mergedTextureStrideY * pSizeCoeffs[i]);
-        auto actualStrideX = static_cast<uint32_t>(mergedTextureStrideX * pSizeCoeffs[i]);
+        auto actualStrideY = static_cast<uint32_t>(mergedTextureStrideY * pSizeCoeffs[i] * uvHeights[i]);
+        auto actualStrideX = static_cast<uint32_t>(mergedTextureStrideX * pSizeCoeffs[i] * uvWidths[i]);
 
         for (uint32_t y = 0; y < actualStrideY; y++)
         {
