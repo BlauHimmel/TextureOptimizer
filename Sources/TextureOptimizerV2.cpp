@@ -4,6 +4,8 @@
 #include <queue>
 #include <random>
 
+#include <finders_interface.h>
+
 #include "IglDebugViewer.hpp"
 #include "Logger.hpp"
 #include "ClusteringAlgorithm.hpp"
@@ -161,17 +163,6 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
         Logger::Info("Submesh %zd completed!", i);
     }
 
-    std::string mergedMeshOutput = meshOutput;
-    std::string mergedTextureOutput = textureOutput;
-
-    mergedMeshOutput.insert(mergedMeshOutput.find(".opt"), "_Merged");
-    mergedTextureOutput.insert(mergedTextureOutput.find(".opt"), "_Merged");
-
-    auto sqrtAtlasNum = static_cast<uint32_t>(std::sqrt(atlasInfo->atlasNum));
-    uint32_t mergedTextureWidth = (width == uint32_t(-1) ? m_pTexture->Width() : width * sqrtAtlasNum);
-    uint32_t mergedTextureHeight = (height == uint32_t(-1) ? m_pTexture->Height() : height * sqrtAtlasNum);
-    uint32_t mergedTextureChannels = m_pTexture->Channels();
-
     for (size_t i = 0; i < atlasInfo->atlasNum; i++)
     {
         std::string submeshOutput = meshOutput;
@@ -200,6 +191,17 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
         Logger::Info("Successfully write subtexture [%zd]: \"%s\"!", i, subtextureOutput.c_str());
     }
 
+    std::string mergedMeshOutput = meshOutput;
+    std::string mergedTextureOutput = textureOutput;
+
+    mergedMeshOutput.insert(mergedMeshOutput.find(".opt"), "_Merged");
+    mergedTextureOutput.insert(mergedTextureOutput.find(".opt"), "_Merged");
+
+    auto sqrtAtlasNum = static_cast<uint32_t>(std::sqrt(atlasInfo->atlasNum));
+    uint32_t mergedTextureWidth = (width == uint32_t(-1) ? m_pTexture->Width() : width) * sqrtAtlasNum;
+    uint32_t mergedTextureHeight = (height == uint32_t(-1) ? m_pTexture->Height() : height) * sqrtAtlasNum;
+    uint32_t mergedTextureChannels = m_pTexture->Channels();
+
     Logger::Info("Merging submeshes and textures...");
     if (!MergeResultAndWrite(subMeshes.get(), subTextures.get(), sizeCoeffs.data(), uvWidths.data(), uvHeights.data(),
         atlasInfo->atlasNum, mergedTextureWidth, mergedTextureHeight, mergedTextureChannels, mergedMeshOutput, mergedTextureOutput))
@@ -221,7 +223,7 @@ struct TexCoord2DHasher
     }
 };
 
-std::unique_ptr<AtlasInfo> TextureOptimizerV2::MarkAtlasIndex(TriMesh * pMesh)
+[[maybe_unused]] std::unique_ptr<AtlasInfo> TextureOptimizerV2::MarkAtlasIndex(TriMesh * pMesh)
 {
     if (pMesh == nullptr) { return nullptr; }
 
@@ -334,7 +336,7 @@ std::unique_ptr<AtlasInfo> TextureOptimizerV2::MarkAtlasIndex(TriMesh * pMesh)
     return atlasInfo;
 }
 
-size_t TextureOptimizerV2::MergeAtlas(TriMesh * pMesh, AtlasInfo * pAtlasInfo)
+[[maybe_unused]] size_t TextureOptimizerV2::MergeAtlas(TriMesh * pMesh, AtlasInfo * pAtlasInfo)
 {
     if (pMesh == nullptr || pAtlasInfo == nullptr)
     {
@@ -820,8 +822,8 @@ bool TextureOptimizerV2::MergeResultAndWrite(const TriMesh * pMeshes, const Text
         uint32_t baseX = mergedTextureStrideX * (i % atlasStride);
         uint32_t baseY = mergedTextureStrideY * (atlasStride - 1 - i / atlasStride);
 
-        auto actualStrideY = static_cast<uint32_t>(mergedTextureStrideY * pSizeCoeffs[i] * uvHeights[i]);
         auto actualStrideX = static_cast<uint32_t>(mergedTextureStrideX * pSizeCoeffs[i] * uvWidths[i]);
+        auto actualStrideY = static_cast<uint32_t>(mergedTextureStrideY * pSizeCoeffs[i] * uvHeights[i]);
 
         for (uint32_t y = 0; y < actualStrideY; y++)
         {

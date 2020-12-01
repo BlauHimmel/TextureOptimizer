@@ -54,6 +54,7 @@ SET(EXT_INCLUDE_DIRS
         Libraries/SLIM/include
         Libraries/glad/include
         Libraries/EBP/include
+        Libraries/rectpack2D/include
         ${GLFW3_INCLUDE_DIR}
         ${MKL_INCLUDE_DIR})
 SET(INCLUDE_DIRS
