@@ -203,8 +203,8 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
     uint32_t mergedTextureChannels = m_pTexture->Channels();
 
     Logger::Info("Merging submeshes and textures...");
-    if (!MergeResultAndWrite(subMeshes.get(), subTextures.get(), sizeCoeffs.data(), uvWidths.data(), uvHeights.data(),
-        atlasInfo->atlasNum, mergedTextureWidth, mergedTextureHeight, mergedTextureChannels, mergedMeshOutput, mergedTextureOutput))
+    if (!MergeResultAndWriteV2(subMeshes.get(), subTextures.get(), atlasInfo->atlasNum, mergedTextureWidth, mergedTextureHeight,
+        mergedTextureChannels, mergedMeshOutput, mergedTextureOutput))
     {
         Logger::Error("Error occurred when merging submeshes and textures.");
         return false;
@@ -734,7 +734,7 @@ std::unique_ptr<TriMesh[]> TextureOptimizerV2::CreateSubMeshFromAtlas(const TriM
     return subMeshes;
 }
 
-bool TextureOptimizerV2::MergeResultAndWrite(const TriMesh * pMeshes, const Texture * pTextures, const Real * pSizeCoeffs,
+[[maybe_unused]] bool TextureOptimizerV2::MergeResultAndWrite(const TriMesh * pMeshes, const Texture * pTextures, const Real * pSizeCoeffs,
     const Real * uvWidths, const Real * uvHeights, size_t clusterNum, uint32_t mergedTextureWidth, uint32_t mergedTextureHeight,
     uint32_t mergedTextureChannels, const std::string & meshOutput, const std::string & textureOutput)
 {
@@ -834,6 +834,169 @@ bool TextureOptimizerV2::MergeResultAndWrite(const TriMesh * pMeshes, const Text
                 Real normalizedX = static_cast<Real>(x) / static_cast<Real>(actualStrideX - 1);
                 auto srcPixel = pTextures[i].Sample(normalizedX, normalizedY);
                 uint8_t * pDstPixel = mergedTexture.At(baseX + x, baseY + y + offsetY);
+
+                for (uint32_t c = 0; c < mergedTexture.Channels(); c++)
+                {
+                    pDstPixel[c] = srcPixel[c];
+                }
+            }
+        }
+    }
+
+    OpenMesh::IO::Options wOpts;
+    wOpts += OpenMesh::IO::Options::FaceTexCoord;
+
+    bool bSuccessMesh = OpenMesh::IO::write_mesh(mergedMesh, meshOutput, wOpts);
+    bool bSuccessTexture = mergedTexture.Write(textureOutput);
+
+    return bSuccessMesh && bSuccessTexture;
+}
+
+bool TextureOptimizerV2::MergeResultAndWriteV2(const TriMesh * pMeshes, const Texture * pTextures,
+    size_t clusterNum, uint32_t mergedTextureWidth, uint32_t mergedTextureHeight,
+    uint32_t mergedTextureChannels, const std::string & meshOutput, const std::string & textureOutput)
+{
+    if (pMeshes == nullptr || pTextures == nullptr || clusterNum == 0)
+    {
+        return false;
+    }
+
+    for (size_t i = 0; i < clusterNum; i++)
+    {
+        if (pTextures[i].Channels() != mergedTextureChannels)
+        {
+            Logger::Error("Channels of all subtexture should be equal to the channels of the merged texture.");
+            return false;
+        }
+    }
+
+    const auto bAllowFlip = false;
+    const auto runtimeFlippingMode = rectpack2D::flipping_option::DISABLED;
+    using TSpaces = rectpack2D::empty_spaces<bAllowFlip, rectpack2D::default_empty_spaces>;
+    using TRect = rectpack2D::output_rect_t<TSpaces>;
+
+    auto ReportSuccessFunc = [](TRect &)
+    {
+        return rectpack2D::callback_result::CONTINUE_PACKING;
+    };
+    auto ReportFailFunc = [](TRect &)
+    {
+        return rectpack2D::callback_result::ABORT_PACKING;
+    };
+
+    const auto maxSide = static_cast<int>(std::max(mergedTextureWidth, mergedTextureHeight));
+    const auto discardStep = 1;
+
+    std::vector<TRect> rectangles;
+    for (int i = 0; i < clusterNum; i++)
+    {
+        auto w = static_cast<int>(pTextures[i].Width());
+        auto h = static_cast<int>(pTextures[i].Height());
+        rectangles.emplace_back(rectpack2D::rect_xywh(0, 0, w, h));
+    }
+
+    const auto resultSize = rectpack2D::find_best_packing<TSpaces>(
+        rectangles,
+        rectpack2D::make_finder_input(
+            maxSide,
+            discardStep,
+            ReportSuccessFunc,
+            ReportFailFunc,
+            runtimeFlippingMode
+        )
+    );
+
+    std::vector<Real> packBaseX(clusterNum, 0);
+    std::vector<Real> packBaseY(clusterNum, 0);
+    std::vector<Real> packWidth(clusterNum, 0);
+    std::vector<Real> packHeight(clusterNum, 0);
+
+    for (int i = 0; i < clusterNum; i++)
+    {
+        packBaseX[i] = static_cast<Real>(rectangles[i].x) / static_cast<Real>(resultSize.w);
+        packBaseY[i] = static_cast<Real>(rectangles[i].y) / static_cast<Real>(resultSize.h);
+        packWidth[i] = static_cast<Real>(rectangles[i].w) / static_cast<Real>(resultSize.w);
+        packHeight[i] = static_cast<Real>(rectangles[i].h) / static_cast<Real>(resultSize.h);
+    }
+
+    mergedTextureWidth = static_cast<uint32_t>(resultSize.w);
+    mergedTextureHeight = static_cast<uint32_t>(resultSize.h);
+
+    TriMesh mergedMesh;
+    mergedMesh.request_halfedge_texcoords2D();
+
+    Texture mergedTexture;
+    mergedTexture.Create(mergedTextureWidth, mergedTextureHeight, mergedTextureChannels);
+
+    std::unordered_map<int, std::unordered_map<int, int>> subMeshVertexMap;
+    std::vector<OpenMesh::VertexHandle> vhs;
+    for (int i = 0; i < clusterNum; i++)
+    {
+        for (const auto vh : pMeshes[i].vertices())
+        {
+            subMeshVertexMap[i][vh.idx()] = static_cast<int>(vhs.size());
+
+            const auto & point = pMeshes[i].point(vh);
+            const auto newVH = mergedMesh.add_vertex(point);
+            vhs.push_back(newVH);
+        }
+    }
+
+    for (int i = 0; i < clusterNum; i++)
+    {
+        for (const auto fh : pMeshes[i].faces())
+        {
+            std::vector<OpenMesh::VertexHandle> faceVHs;
+            std::unordered_map<int, TriMesh::TexCoord2D> vhUVMap;
+
+            for (const auto heh : pMeshes[i].fh_range(fh))
+            {
+                const auto vh = pMeshes[i].to_vertex_handle(heh);
+                const auto & uv = pMeshes[i].texcoord2D(heh);
+
+                int remappedIdx = subMeshVertexMap[i][vh.idx()];
+                vhUVMap[vhs[remappedIdx].idx()] = uv;
+                faceVHs.push_back(vhs[remappedIdx]);
+            }
+
+            const auto newFH = mergedMesh.add_face(faceVHs);
+
+            for (const auto heh : mergedMesh.fh_range(newFH))
+            {
+                const auto vh = mergedMesh.to_vertex_handle(heh);
+                auto uv = vhUVMap[vh.idx()];
+                uv[0] = (uv[0] * packWidth[i]) + packBaseX[i];
+                uv[1] = (uv[1] * packHeight[i]) + packBaseY[i];
+                mergedMesh.set_texcoord2D(heh, uv);
+            }
+        }
+    }
+
+    for (const auto heh : mergedMesh.halfedges())
+    {
+        const auto & uv = mergedMesh.texcoord2D(heh);
+        if (mergedMesh.is_boundary(heh))
+        {
+            mergedMesh.set_texcoord2D(heh, { 0.0, 0.0 });
+        }
+    }
+
+    for (uint32_t i = 0; i < clusterNum; i++)
+    {
+        auto actualStrideX = static_cast<uint32_t>(rectangles[i].w);
+        auto actualStrideY = static_cast<uint32_t>(rectangles[i].h);
+
+        auto baseX = static_cast<uint32_t>(rectangles[i].x);
+        auto baseY = static_cast<uint32_t>(rectangles[i].y);
+
+        for (uint32_t y = 0; y < actualStrideY; y++)
+        {
+            Real normalizedY = 1.0 - static_cast<Real>(y) / static_cast<Real>(actualStrideY - 1);
+            for (uint32_t x = 0; x < actualStrideX; x++)
+            {
+                Real normalizedX = static_cast<Real>(x) / static_cast<Real>(actualStrideX - 1);
+                auto srcPixel = pTextures[i].Sample(normalizedX, normalizedY);
+                uint8_t * pDstPixel = mergedTexture.At(baseX + x, mergedTextureHeight - 1 - (baseY + y));
 
                 for (uint32_t c = 0; c < mergedTexture.Channels(); c++)
                 {
