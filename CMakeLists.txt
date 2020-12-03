@@ -35,6 +35,7 @@ SET(OPENMESH_LIBRARIES OpenMeshCore OpenMeshTools)
 SET(TBB_LIBRARIES ${TBB_IMPORTED_TARGETS})
 SET(SLIM_LIBRARIES SLIM)
 SET(EBP_LIBRARIES EBP)
+SET(TRIANGLE_LIBRARIES triangle)
 SET(EXT_LIBRARIES
         ${EIGEN3_LIBRARIES}
         ${OPENMESH_LIBRARIES}
@@ -43,7 +44,8 @@ SET(EXT_LIBRARIES
         ${MKL_LIBRARIES}
         ${GLFW3_LIBRARY}
         ${GLFW_LIBRARIES}
-        ${EBP_LIBRARIES})
+        ${EBP_LIBRARIES}
+        ${TRIANGLE_LIBRARIES})
 
 SET(PROJECT_INCLUDE_DIRS Includes)
 SET(EXT_INCLUDE_DIRS
@@ -54,6 +56,7 @@ SET(EXT_INCLUDE_DIRS
         Libraries/SLIM/include
         Libraries/glad/include
         Libraries/EBP/include
+        Libraries/EBP/ext/triangle
         Libraries/rectpack2D/include
         ${GLFW3_INCLUDE_DIR}
         ${MKL_INCLUDE_DIR})

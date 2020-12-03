@@ -31,10 +31,14 @@ private:
     static std::unique_ptr<TriMesh[]> CreateSubMeshFromAtlas(const TriMesh * pMesh, AtlasInfo * pAtlasInfo);
     [[maybe_unused]] static bool MergeResultAndWrite(const TriMesh * pMeshes, const Texture * pTextures, const Real * pSizeCoeffs,
         const Real * uvWidths, const Real * uvHeights, size_t clusterNum, uint32_t mergedTextureWidth, uint32_t mergedTextureHeight,
-        uint32_t mergedTextureChannels, const std::string & meshOutput, const std::string & textureOutput);
+        uint32_t mergedTextureChannels, const std::string & meshOutput, const std::string & textureOutput,
+        TriMesh * pMergedMesh, Texture * pMergedTexture);
     static bool MergeResultAndWriteV2(const TriMesh * pMeshes, const Texture * pTextures,
         size_t clusterNum, uint32_t mergedTextureWidth, uint32_t mergedTextureHeight,
-        uint32_t mergedTextureChannels, const std::string & meshOutput, const std::string & textureOutput);
+        uint32_t mergedTextureChannels, const std::string & meshOutput, const std::string & textureOutput,
+        TriMesh * pMergedMesh, Texture * pMergedTexture);
+    static bool FurtherOptimize(const TriMesh * pMergedMesh, const Texture * pMergedTexture, const std::string & meshOutput, const std::string & textureOutput);
+
 private:
     static void MergeAtlasInfoAndFProperty(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, size_t source, size_t target);
     static void RemapAtlasInfoKeyInSequence(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, const std::set<size_t> & atlasIdxSet);

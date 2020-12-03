@@ -3,8 +3,10 @@
 #include <unordered_set>
 #include <queue>
 #include <random>
+#include <filesystem>
 
 #include <finders_interface.h>
+#include <igl/triangle/triangulate.h>
 
 #include "IglDebugViewer.hpp"
 #include "Logger.hpp"
@@ -202,15 +204,33 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
     uint32_t mergedTextureHeight = (height == uint32_t(-1) ? m_pTexture->Height() : height) * sqrtAtlasNum;
     uint32_t mergedTextureChannels = m_pTexture->Channels();
 
+    TriMesh mergedMesh;
+    Texture mergedTexture;
+
     Logger::Info("Merging submeshes and textures...");
     if (!MergeResultAndWriteV2(subMeshes.get(), subTextures.get(), atlasInfo->atlasNum, mergedTextureWidth, mergedTextureHeight,
-        mergedTextureChannels, mergedMeshOutput, mergedTextureOutput))
+        mergedTextureChannels, mergedMeshOutput, mergedTextureOutput, &mergedMesh, &mergedTexture))
     {
         Logger::Error("Error occurred when merging submeshes and textures.");
         return false;
     }
     Logger::Info(R"(Successfully write merged mesh: "%s" and merged texture: "%s"!)", mergedMeshOutput.c_str(), mergedTextureOutput.c_str());
     Logger::Info("<MergeResultAndWrite> Completed!");
+
+    std::string optMergedMeshOutput = meshOutput;
+    std::string optMergedTextureOutput = textureOutput;
+
+    optMergedMeshOutput.insert(optMergedMeshOutput.find(".opt"), "_OptMerged");
+    optMergedTextureOutput.insert(optMergedTextureOutput.find(".opt"), "_OptMerged");
+
+    Logger::Info("Further optimizing the merged mesh and the merged textures...");
+    if (!FurtherOptimize(&mergedMesh, &mergedTexture, optMergedMeshOutput, optMergedTextureOutput))
+    {
+        Logger::Error("Error occurred when further optimizing the merged mesh and the merged textures.");
+        return false;
+    }
+    Logger::Info(R"(Successfully write optimized merged mesh: "%s" and optimized merged texture: "%s"!)", optMergedMeshOutput.c_str(), optMergedTextureOutput.c_str());
+    Logger::Info("<FurtherOptimize> Completed!");
 
     return true;
 }
@@ -736,7 +756,8 @@ std::unique_ptr<TriMesh[]> TextureOptimizerV2::CreateSubMeshFromAtlas(const TriM
 
 [[maybe_unused]] bool TextureOptimizerV2::MergeResultAndWrite(const TriMesh * pMeshes, const Texture * pTextures, const Real * pSizeCoeffs,
     const Real * uvWidths, const Real * uvHeights, size_t clusterNum, uint32_t mergedTextureWidth, uint32_t mergedTextureHeight,
-    uint32_t mergedTextureChannels, const std::string & meshOutput, const std::string & textureOutput)
+    uint32_t mergedTextureChannels, const std::string & meshOutput, const std::string & textureOutput,
+    TriMesh * pMergedMesh, Texture * pMergedTexture)
 {
     if (pMeshes == nullptr || pTextures == nullptr || pSizeCoeffs == nullptr || uvWidths == nullptr || uvHeights == nullptr || clusterNum == 0)
     {
@@ -849,12 +870,19 @@ std::unique_ptr<TriMesh[]> TextureOptimizerV2::CreateSubMeshFromAtlas(const TriM
     bool bSuccessMesh = OpenMesh::IO::write_mesh(mergedMesh, meshOutput, wOpts);
     bool bSuccessTexture = mergedTexture.Write(textureOutput);
 
+    if (bSuccessMesh && bSuccessTexture)
+    {
+        pMergedMesh->assign(mergedMesh, true);
+        mergedTexture.CopyTo(pMergedTexture);
+    }
+
     return bSuccessMesh && bSuccessTexture;
 }
 
 bool TextureOptimizerV2::MergeResultAndWriteV2(const TriMesh * pMeshes, const Texture * pTextures,
     size_t clusterNum, uint32_t mergedTextureWidth, uint32_t mergedTextureHeight,
-    uint32_t mergedTextureChannels, const std::string & meshOutput, const std::string & textureOutput)
+    uint32_t mergedTextureChannels, const std::string & meshOutput, const std::string & textureOutput,
+    TriMesh * pMergedMesh, Texture * pMergedTexture)
 {
     if (pMeshes == nullptr || pTextures == nullptr || clusterNum == 0)
     {
@@ -1012,7 +1040,316 @@ bool TextureOptimizerV2::MergeResultAndWriteV2(const TriMesh * pMeshes, const Te
     bool bSuccessMesh = OpenMesh::IO::write_mesh(mergedMesh, meshOutput, wOpts);
     bool bSuccessTexture = mergedTexture.Write(textureOutput);
 
+    if (bSuccessMesh && bSuccessTexture)
+    {
+        pMergedMesh->assign(mergedMesh, true);
+        mergedTexture.CopyTo(pMergedTexture);
+    }
+
     return bSuccessMesh && bSuccessTexture;
+}
+
+struct PointHasher
+{
+    size_t operator()(const TriMesh::Point & pt) const
+    {
+        return std::hash<Real>()(pt[0]) ^ std::hash<Real>()(pt[1]) ^ std::hash<Real>()(pt[2]);
+    }
+};
+
+bool TextureOptimizerV2::FurtherOptimize(const TriMesh * pMergedMesh, const Texture * pMergedTexture, const std::string & meshOutput, const std::string & textureOutput)
+{
+    if (pMergedMesh == nullptr || pMergedTexture == nullptr)
+    {
+        return false;
+    }
+
+    TriMesh uvMesh;
+    std::vector<OpenMesh::VertexHandle> vhs;
+    vhs.reserve(pMergedMesh->n_vertices());
+
+    for (const auto vh : pMergedMesh->vertices())
+    {
+        TriMesh::TexCoord2D uv;
+        for (const auto heh : pMergedMesh->vih_range(vh))
+        {
+            if (!pMergedMesh->is_boundary(heh))
+            {
+                uv = pMergedMesh->texcoord2D(heh);
+                break;
+            }
+        }
+
+        for (const auto heh : pMergedMesh->vih_range(vh))
+        {
+            if (!pMergedMesh->is_boundary(heh))
+            {
+                if (pMergedMesh->texcoord2D(heh) != uv)
+                {
+                    Logger::Error("Multiple different texcoords assigned to single vertex!");
+                    return false;
+                }
+            }
+        }
+
+        const auto newVH = uvMesh.add_vertex({uv[0], uv[1], 0.0});
+        vhs.push_back(newVH);
+    }
+
+    for (const auto fh : pMergedMesh->faces())
+    {
+        std::vector<OpenMesh::VertexHandle> faceVHs;
+        for (const auto vh :pMergedMesh->fv_range(fh))
+        {
+            faceVHs.push_back(vhs[vh.idx()]);
+        }
+        uvMesh.add_face(faceVHs);
+    }
+
+    const size_t boundarySubdivisionTimes = 25;
+    const Real boundarySubdivisionDelta = 1.0 / static_cast<Real>(boundarySubdivisionTimes);
+
+    auto boundaries = MeshBoundaryVertices(&uvMesh);
+    size_t totalBoundaryVertexNum = 4 * boundarySubdivisionTimes;
+    for (const auto & boundary : boundaries)
+    {
+        totalBoundaryVertexNum += boundary.size();
+    }
+
+    Eigen::MatrixXd V;
+    Eigen::MatrixXi E;
+    Eigen::MatrixXd H;
+    Eigen::MatrixXd V2;
+    Eigen::MatrixXi F2;
+
+    V.resize(totalBoundaryVertexNum,2);
+    E.resize(totalBoundaryVertexNum,2);
+
+    std::vector<std::vector<Real>> holeVertices;
+
+    size_t idxBase = 0;
+
+    for (const auto & boundary : boundaries)
+    {
+        for (size_t j = 0; j < boundary.size(); j++)
+        {
+            const auto & pt = uvMesh.point(boundary[j]);
+
+            V(idxBase + j, 0) = pt[0];
+            V(idxBase + j, 1) = pt[1];
+
+            E(idxBase + j, 0) = idxBase + j;
+            E(idxBase + j, 1) = idxBase + ((j + 1) % boundary.size());
+        }
+
+        std::set<int> holeVertexSet;
+
+        for (const auto & boundarVH : boundary)
+        {
+            for (const auto vh : uvMesh.vv_range(boundarVH))
+            {
+                if (!uvMesh.is_boundary(vh) && holeVertexSet.count(vh.idx()) == 0)
+                {
+                    const auto & pt = uvMesh.point(vh);
+                    holeVertices.push_back({ pt[0], pt[1] });
+                    holeVertexSet.insert(vh.idx());
+                }
+            }
+        }
+
+        idxBase += boundary.size();
+    }
+
+    Real boundaryX = 0.0, boundaryY = 0.0;
+    for (size_t i = 0; i < boundarySubdivisionTimes; i++)
+    {
+        V(idxBase + i, 0) =  boundaryX * 1.05 - 0.025;
+        V(idxBase + i, 1) =  boundaryY * 1.05 - 0.025;
+        E(idxBase + i, 0) = idxBase + i;
+        E(idxBase + i, 1) = idxBase + i + 1;
+        boundaryX += boundarySubdivisionDelta;
+    }
+
+    for (size_t i = boundarySubdivisionTimes; i < 2 * boundarySubdivisionTimes; i++)
+    {
+        V(idxBase + i, 0) =  boundaryX * 1.05 - 0.025;
+        V(idxBase + i, 1) =  boundaryY * 1.05 - 0.025;
+        E(idxBase + i, 0) = idxBase + i;
+        E(idxBase + i, 1) = idxBase + i + 1;
+        boundaryY += boundarySubdivisionDelta;
+    }
+
+    for (size_t i = 2 * boundarySubdivisionTimes; i < 3 * boundarySubdivisionTimes; i++)
+    {
+        V(idxBase + i, 0) =  boundaryX * 1.05 - 0.025;
+        V(idxBase + i, 1) =  boundaryY * 1.05 - 0.025;
+        E(idxBase + i, 0) = idxBase + i;
+        E(idxBase + i, 1) = idxBase + i + 1;
+        boundaryX -= boundarySubdivisionDelta;
+    }
+
+    for (size_t i = 3 * boundarySubdivisionTimes; i < 4 * boundarySubdivisionTimes; i++)
+    {
+        V(idxBase + i, 0) =  boundaryX * 1.05 - 0.025;
+        V(idxBase + i, 1) =  boundaryY * 1.05 - 0.025;
+        E(idxBase + i, 0) = idxBase + i;
+        E(idxBase + i, 1) = idxBase + ((i + 1) % (4 * boundarySubdivisionTimes));
+        boundaryY -= boundarySubdivisionDelta;
+    }
+
+    H.resize(holeVertices.size(), 2);
+    for (size_t i = 0; i < holeVertices.size(); i++)
+    {
+        H(i, 0) = holeVertices[i][0];
+        H(i, 1) = holeVertices[i][1];
+    }
+
+    igl::triangle::triangulate(V, E, H,"a0.001q15YYQ",V2,F2);
+
+    TriMesh scaffoldUVMesh;
+    scaffoldUVMesh.request_vertex_texcoords2D();
+    vhs.clear();
+    std::unordered_map<TriMesh::Point, int, PointHasher> boundaryVertexIdxMap;
+    std::vector<int> faceTypes(uvMesh.n_faces() + F2.rows(), -1); /* 0 for scaffold, 1 for mesh */
+
+    for (const auto vh : uvMesh.vertices())
+    {
+        const auto & pt = uvMesh.point(vh);
+        const auto newVH = scaffoldUVMesh.add_vertex(pt);
+        if (uvMesh.is_boundary(vh))
+        {
+            boundaryVertexIdxMap[pt] = vhs.size();
+        }
+        vhs.push_back(newVH);
+    }
+
+    for (const auto fh : uvMesh.faces())
+    {
+        std::vector<OpenMesh::VertexHandle> faceVHs;
+        for (const auto vh :uvMesh.fv_range(fh))
+        {
+            faceVHs.push_back(vhs[vh.idx()]);
+        }
+        const auto newFH = scaffoldUVMesh.add_face(faceVHs);
+        faceTypes[newFH.idx()] = 1;
+    }
+
+    std::vector<OpenMesh::VertexHandle> scaffoldVHs;
+    for (Eigen::Index i = 0; i < V2.rows(); i++)
+    {
+        const TriMesh::Point pt = { V2(i, 0), V2(i, 1), 0.0 };
+        if (boundaryVertexIdxMap.count(pt) == 0)
+        {
+            const auto newVH = scaffoldUVMesh.add_vertex(pt);
+            scaffoldVHs.push_back(newVH);
+        }
+        else
+        {
+            scaffoldVHs.push_back(TriMesh::InvalidVertexHandle);
+        }
+    }
+
+    for (Eigen::Index i = 0; i < F2.rows(); i++)
+    {
+        std::vector<OpenMesh::VertexHandle> faceVHs;
+        for (Eigen::Index j = 0; j < 3; j++)
+        {
+            int idx = F2(i, j);
+            const TriMesh::Point pt = { V2(idx, 0), V2(idx, 1), 0.0 };
+            if (boundaryVertexIdxMap.count(pt) == 0)
+            {
+                faceVHs.push_back(scaffoldVHs[idx]);
+            }
+            else
+            {
+                faceVHs.push_back(vhs[boundaryVertexIdxMap[pt]]);
+            }
+        }
+        const auto newFH = scaffoldUVMesh.add_face(faceVHs);
+        faceTypes[newFH.idx()] = 0;
+    }
+
+    for (const auto vh : scaffoldUVMesh.vertices())
+    {
+        const auto & pt = scaffoldUVMesh.point(vh);
+        scaffoldUVMesh.set_texcoord2D(vh, { pt[0], pt[1] });
+    }
+
+    {
+        /* visualization used for debug */
+        Eigen::MatrixXi FF;
+        FF.resize(scaffoldUVMesh.n_faces(), 3);
+
+        for (int i = 0; i < scaffoldUVMesh.n_faces(); i++)
+        {
+            const auto fh = TriMesh::FaceHandle(i);
+
+            auto fvIter = scaffoldUVMesh.fv_range(fh).begin();
+            auto fvIterEnd = scaffoldUVMesh.fv_range(fh).end();
+
+            const auto vh0 = *fvIter;
+            *fvIter++;
+            const auto vh1 = *fvIter;
+            *fvIter++;
+            const auto vh2 = *fvIter;
+            *fvIter++;
+
+            FF(i, 0) = vh0.idx();
+            FF(i, 1) = vh1.idx();
+            FF(i, 2) = vh2.idx();
+        }
+
+        Eigen::MatrixXd VV;
+        VV.resize(scaffoldUVMesh.n_vertices(), 3);
+
+        for (int i = 0; i < scaffoldUVMesh.n_vertices(); i++)
+        {
+            const auto vh = TriMesh::VertexHandle (i);
+            const auto & point = scaffoldUVMesh.point(vh);
+
+            VV(i, 0) = point[0];
+            VV(i, 1) = point[1];
+            VV(i, 2) = point[2];
+        }
+
+        Eigen::MatrixXd CC;
+        CC.resize(FF.rows(), 3);
+        for (size_t i = 0; i < CC.rows(); i++)
+        {
+            if (i < uvMesh.n_faces())
+            {
+                CC(i, 0) = 1.0;
+                CC(i, 1) = 1.0;
+                CC(i, 2) = 0.0;
+            }
+            else
+            {
+                CC(i, 0) = 1.0;
+                CC(i, 1) = 1.0;
+                CC(i, 2) = 1.0;
+            }
+        }
+
+        DisplayVFC(VV, FF, CC, "Scaffold UV Mesh");
+        DisplayVF(V2, F2, "Scaffold");
+    }
+
+    OpenMesh::IO::Options wOpts;
+    wOpts += OpenMesh::IO::Options::VertexTexCoord;
+
+    bool bSuccessMesh = OpenMesh::IO::write_mesh(scaffoldUVMesh, meshOutput, wOpts);
+
+    std::filesystem::path meshPath(meshOutput);
+    std::string faceTypeOutput = meshPath.parent_path().string() + "\\FaceType.txt";
+
+    std::ofstream faceTypeFile(faceTypeOutput);
+    for (int faceType : faceTypes)
+    {
+        faceTypeFile << faceType << std::endl;
+    }
+    faceTypeFile.close();
+
+    return bSuccessMesh;
 }
 
 void TextureOptimizerV2::MergeAtlasInfoAndFProperty(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, size_t source, size_t target)

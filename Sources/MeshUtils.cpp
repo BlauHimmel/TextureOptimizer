@@ -90,7 +90,7 @@ size_t MeshComponentCount(const TriMesh * pMesh)
     return MeshComponentVertices(pMesh).size();
 }
 
-std::vector<std::vector<OpenMesh::VertexHandle>> MeshBoundaryVertices(const TriMesh *pMesh)
+std::vector<std::vector<OpenMesh::VertexHandle>> MeshBoundaryVertices(const TriMesh * pMesh)
 {
     TriMesh mesh(*pMesh);
     std::vector<std::vector<OpenMesh::VertexHandle>> boundaryVertices;
@@ -120,6 +120,7 @@ std::vector<std::vector<OpenMesh::VertexHandle>> MeshBoundaryVertices(const TriM
         }
         boundaryVertices.push_back(boundary);
     }
+    mesh.remove_property(visitedHProp);
 
     return boundaryVertices;
 }

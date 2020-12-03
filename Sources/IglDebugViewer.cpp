@@ -80,3 +80,18 @@ void DisplayAtlas(TriMesh * pMesh, size_t atlasNum, const std::string & atlasIdx
     viewer.data().set_colors(C);
     viewer.launch(true, false, title);
 }
+
+void DisplayVF(const Eigen::MatrixXd & V, const Eigen::MatrixXi & F, const std::string & title)
+{
+    igl::opengl::glfw::Viewer viewer;
+    viewer.data().set_mesh(V, F);
+    viewer.launch(true, false, title);
+}
+
+void DisplayVFC(const Eigen::MatrixXd & V, const Eigen::MatrixXi & F, const Eigen::MatrixXd & C, const std::string & title)
+{
+    igl::opengl::glfw::Viewer viewer;
+    viewer.data().set_mesh(V, F);
+    viewer.data().set_colors(C);
+    viewer.launch(true, false, title);
+}
