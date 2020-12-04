@@ -3,7 +3,6 @@
 #include <unordered_set>
 #include <queue>
 #include <random>
-#include <filesystem>
 
 #include <finders_interface.h>
 #include <igl/triangle/triangulate.h>
@@ -29,26 +28,6 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
     Logger::Info("Repairing non-manifold vertices of the mesh...");
     RepairNonManifold(m_pMesh);
     Logger::Info("<RepairNonManifold> Completed!");
-
-/*
-    Logger::Info("Marking the atlas info...");
-    std::unique_ptr<AtlasInfo> atlasInfo = MarkAtlasIndex(m_pMesh);
-    if (atlasInfo == nullptr)
-    {
-        Logger::Error("Error occurred when marking the atlas info.");
-        return false;
-    }
-    Logger::Info("<MarkAtlasIndex> Completed!");
-
-    Logger::Info("Merging the atlas...");
-    size_t atlasNum = MergeAtlas(m_pMesh, atlasInfo.get());
-    if (atlasNum == size_t(-1))
-    {
-        Logger::Error("Error occurred when merging the atlas.");
-        return false;
-    }
-    Logger::Info("<MergeAtlas> Completed! Now, there are %zd atlas.", atlasNum);
-*/
 
     Logger::Info("Clustering the mesh...");
     std::unique_ptr<AtlasInfo> atlasInfo = MeshClustering(m_pMesh);
@@ -1334,22 +1313,10 @@ bool TextureOptimizerV2::FurtherOptimize(const TriMesh * pMergedMesh, const Text
         DisplayVF(V2, F2, "Scaffold");
     }
 
-    OpenMesh::IO::Options wOpts;
-    wOpts += OpenMesh::IO::Options::VertexTexCoord;
+    /* TODO: Use OMT to optimize the scaffold uv mesh. */
+    /* TODO: Remember that scaffold mesh is scaled a little bit bigger than origin. */
 
-    bool bSuccessMesh = OpenMesh::IO::write_mesh(scaffoldUVMesh, meshOutput, wOpts);
-
-    std::filesystem::path meshPath(meshOutput);
-    std::string faceTypeOutput = meshPath.parent_path().string() + "\\FaceType.txt";
-
-    std::ofstream faceTypeFile(faceTypeOutput);
-    for (int faceType : faceTypes)
-    {
-        faceTypeFile << faceType << std::endl;
-    }
-    faceTypeFile.close();
-
-    return bSuccessMesh;
+    return true;
 }
 
 void TextureOptimizerV2::MergeAtlasInfoAndFProperty(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, size_t source, size_t target)

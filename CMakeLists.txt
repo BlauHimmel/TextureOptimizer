@@ -58,6 +58,7 @@ SET(EXT_INCLUDE_DIRS
         Libraries/EBP/include
         Libraries/EBP/ext/triangle
         Libraries/rectpack2D/include
+        Libraries/glm/include
         ${GLFW3_INCLUDE_DIR}
         ${MKL_INCLUDE_DIR})
 SET(INCLUDE_DIRS
