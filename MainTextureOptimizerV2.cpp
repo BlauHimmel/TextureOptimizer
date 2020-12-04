@@ -23,7 +23,7 @@ int main(int argc, const char ** argv)
         | lyra::opt(meshFilename, "mesh")["-m"]["--mesh"]("File name of the input mesh").required()
         | lyra::opt(textureFilename, "texture")["-t"]["--texture"]("File name of the input texture").required()
         | lyra::opt(outputFilename, "output")["-o"]["--output"]("Directory of the output files.").required()
-        | lyra::opt(parameterizationMethod, "parameterization")["-p"]["--param"]("Method used for parameterization: 0: Harmonic, 1: SLIM, 2: EBP.").required().choices(0, 1, 2)
+        | lyra::opt(parameterizationMethod, "parameterization")["-p"]["--param"]("Method used for parameterization: 0: Harmonic, 1: SLIM, 2: EBP, 3: SMI04.").required().choices(0, 1, 2, 3)
         | lyra::opt(outputTextureWidth, "width")["-x"]["--width"]("Width of the output texture.").optional()
         | lyra::opt(outputTextureHeight, "height")["-y"]["--height"]("Height of the output texture.").optional();
 

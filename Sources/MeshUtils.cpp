@@ -8,6 +8,7 @@
 #include <progress_bar.h>
 #include <SLIMWrapper.hpp>
 #include <EBPWrapper.h>
+#include <SMI04Wrapper.h>
 
 #include "CutToDiskImpl.hpp"
 #include "Logger.hpp"
@@ -514,6 +515,7 @@ void SLIMProxy(TriMesh * pMesh, Real * pWidth, Real * pHeith)
         auto & point = pMesh->point(vh);
         point[0] = uv[i][0];
         point[1] = uv[i][1];
+        point[2] = 0.0;
     }
 
     Real xMin =  std::numeric_limits<Real>::max();
@@ -604,6 +606,101 @@ void EBPProxy(TriMesh * pMesh, Real * pWidth, Real * pHeith)
         auto & point = pMesh->point(vh);
         point[0] = uv[i][0];
         point[1] = uv[i][1];
+        point[2] = 0.0;
+    }
+
+    Real xMin =  std::numeric_limits<Real>::max();
+    Real yMin =  std::numeric_limits<Real>::max();
+    Real xMax = -std::numeric_limits<Real>::max();
+    Real yMax = -std::numeric_limits<Real>::max();
+
+    for (int i = 0; i < vertexNumber; i++)
+    {
+        const auto vh = TriMesh::VertexHandle (i);
+        const auto & point = pMesh->point(vh);
+
+        xMin = std::min(xMin, point[0]);
+        xMax = std::max(xMax, point[0]);
+
+        yMin = std::min(yMin, point[1]);
+        yMax = std::max(yMax, point[1]);
+    }
+
+    Real invDelta = 1.0 / std::max(xMax - xMin, yMax - yMin);
+    Real invDeltaX = 1.0 / (xMax - xMin);
+    Real invDeltaY = 1.0 / (yMax - yMin);
+
+    for (int i = 0; i < vertexNumber; i++)
+    {
+        const auto vh = TriMesh::VertexHandle (i);
+        auto & point = pMesh->point(vh);
+        point[0] = (point[0] - xMin) * invDeltaX;
+        point[1] = (point[1] - yMin) * invDeltaY;
+    }
+
+    if (pWidth != nullptr)
+    {
+        *pWidth = (xMax - xMin) * invDelta;
+    }
+
+    if (pHeith != nullptr)
+    {
+        *pHeith = (yMax - yMin) * invDelta;
+    }
+}
+
+void SMI04Proxy(TriMesh * pMesh, Real * pWidth, Real * pHeith, Real * pSTL2error)
+{
+    int faceNumber = static_cast<int>(pMesh->n_faces());
+    int vertexNumber =  static_cast<int>(pMesh->n_vertices());
+
+    /* facet(i, j) : index of the j-th vertex at i-th triangle */
+    std::vector<std::vector<size_t>> facets(faceNumber, std::vector<size_t>(3));
+
+    for (int i = 0; i < faceNumber; i++)
+    {
+        const auto fh = TriMesh::FaceHandle(i);
+
+        auto fvIter = pMesh->fv_range(fh).begin();
+        auto fvIterEnd = pMesh->fv_range(fh).end();
+
+        const auto vh0 = *fvIter;
+        *fvIter++;
+        const auto vh1 = *fvIter;
+        *fvIter++;
+        const auto vh2 = *fvIter;
+        *fvIter++;
+
+        facets[i][0] = vh0.idx();
+        facets[i][1] = vh1.idx();
+        facets[i][2] = vh2.idx();
+    }
+
+    /* vertices(i, j) : value of the j-th component of position at i-th vertex */
+    std::vector<std::vector<double>> vertices(vertexNumber, std::vector<double>(3));
+
+    for (int i = 0; i < vertexNumber; i++)
+    {
+        const auto vh = TriMesh::VertexHandle (i);
+        const auto & point = pMesh->point(vh);
+
+        vertices[i][0] = point[0];
+        vertices[i][1] = point[1];
+        vertices[i][2] = point[2];
+    }
+
+    SMI04Configuration config;
+    config.iteNum = static_cast<int>(static_cast<double>(vertices.size()) / 20000.0 * 2000.0);
+
+    auto uv = SMI04(vertices, facets, &config, pSTL2error);
+
+    for (int i = 0; i < vertexNumber; i++)
+    {
+        const auto vh = TriMesh::VertexHandle(i);
+        auto & point = pMesh->point(vh);
+        point[0] = uv[i][0];
+        point[1] = uv[i][1];
+        point[2] = 0.0;
     }
 
     Real xMin =  std::numeric_limits<Real>::max();

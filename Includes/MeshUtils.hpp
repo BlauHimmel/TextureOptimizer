@@ -8,7 +8,8 @@ enum class EParameterization
 {
     EBarycentric = 0,
     ESLIM = 1,
-    EEBP = 2
+    EEBP = 2,
+    ESMI04 = 3
 };
 
 std::vector<std::vector<OpenMesh::VertexHandle>> MeshComponentVertices(const TriMesh * pMesh);
@@ -31,6 +32,7 @@ bool MeshUVTransfer(TriMesh * pMesh, const TriMesh * pUVMesh);
 
 void SLIMProxy(TriMesh * pMesh, Real * pWidth = nullptr, Real * pHeith = nullptr);
 void EBPProxy(TriMesh * pMesh, Real * pWidth = nullptr, Real * pHeith = nullptr);
+void SMI04Proxy(TriMesh * pMesh, Real * pWidth = nullptr, Real * pHeith = nullptr, Real * pSTL2error = nullptr);
 
 bool TextureIntegrate(const TriMesh * pOriginMesh, const TriMesh * pNewMesh, Texture * pTexture, uint32_t width, uint32_t height, uint32_t expandRadius = 4);
 

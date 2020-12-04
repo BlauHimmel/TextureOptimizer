@@ -114,6 +114,18 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
         {
             EBPProxy(&uvMesh, &uvWidths[i], &uvHeights[i]);
         }
+        else if (parameterization == EParameterization::ESMI04)
+        {
+            double stl2error = 0.0;
+            SMI04Proxy(&uvMesh, &uvWidths[i], &uvHeights[i], &stl2error);
+
+            if (stl2error > 10.0)
+            {
+                Logger::Warn("SMI04 parameterization for submesh [%zd] cause high distortion. Try to use EBP instead.", i);
+                uvMesh = subMeshes[i];
+                EBPProxy(&uvMesh, &uvWidths[i], &uvHeights[i]);
+            }
+        }
         else
         {
             Logger::Error("Unkonwn parameterization method [%zd].", i);
@@ -202,14 +214,17 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
     optMergedMeshOutput.insert(optMergedMeshOutput.find(".opt"), "_OptMerged");
     optMergedTextureOutput.insert(optMergedTextureOutput.find(".opt"), "_OptMerged");
 
-    Logger::Info("Further optimizing the merged mesh and the merged textures...");
-    if (!FurtherOptimize(&mergedMesh, &mergedTexture, optMergedMeshOutput, optMergedTextureOutput))
+    if (parameterization != EParameterization::ESMI04 && parameterization != EParameterization::EBarycentric)
     {
-        Logger::Error("Error occurred when further optimizing the merged mesh and the merged textures.");
-        return false;
+        Logger::Info("Further optimizing the merged mesh and the merged textures...");
+        if (!FurtherOptimize(&mergedMesh, &mergedTexture, optMergedMeshOutput, optMergedTextureOutput))
+        {
+            Logger::Error("Error occurred when further optimizing the merged mesh and the merged textures.");
+            return false;
+        }
+        Logger::Info(R"(Successfully write optimized merged mesh: "%s" and optimized merged texture: "%s"!)", optMergedMeshOutput.c_str(), optMergedTextureOutput.c_str());
+        Logger::Info("<FurtherOptimize> Completed!");
     }
-    Logger::Info(R"(Successfully write optimized merged mesh: "%s" and optimized merged texture: "%s"!)", optMergedMeshOutput.c_str(), optMergedTextureOutput.c_str());
-    Logger::Info("<FurtherOptimize> Completed!");
 
     return true;
 }

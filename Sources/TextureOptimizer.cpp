@@ -56,6 +56,10 @@ bool TextureOptimizer::Run(uint32_t width, uint32_t height, EParameterization pa
     {
         EBPProxy(&uvMesh, &uvWidth, &uvHeight);
     }
+    else if (parameterization == EParameterization::ESMI04)
+    {
+        SMI04Proxy(&uvMesh, &uvWidth, &uvHeight);
+    }
     else
     {
         Logger::Error("Unkonwn parameterization method.");
