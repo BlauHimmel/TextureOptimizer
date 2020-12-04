@@ -21,7 +21,7 @@ struct AtlasInfo
 class TextureOptimizerV2
 {
 public:
-    explicit TextureOptimizerV2(TriMesh * pMesh, Texture * pTexture) : m_pMesh(pMesh), m_pTexture(pTexture) { }
+    TextureOptimizerV2(TriMesh * pMesh, Texture * pTexture) : m_pMesh(pMesh), m_pTexture(pTexture) { }
     bool Run(uint32_t width, uint32_t height, EParameterization parameterization, const std::string & meshOutput, const std::string & textureOutput);
 
 private:
@@ -40,12 +40,12 @@ private:
     static bool FurtherOptimize(const TriMesh * pMergedMesh, const Texture * pMergedTexture, const std::string & meshOutput, const std::string & textureOutput);
 
 private:
-    static void MergeAtlasInfoAndFProperty(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, size_t source, size_t target);
-    static void RemapAtlasInfoKeyInSequence(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, const std::set<size_t> & atlasIdxSet);
-    static size_t IntersectNum(const std::set<int> & edges0, const std::set<int> & edges1);
-    static bool IsIntersect(const std::set<int> & edges0, const std::set<int> & edges1);
-    static void SortAtlasSize(std::vector<std::pair<size_t, size_t>/*<atlasIdx, faceNum>*/> & atlasSizes);
-    static int32_t GetAtlasGenus(AtlasInfo * pAtlasInfo, size_t atlasIdx);
+    [[maybe_unused]] static void MergeAtlasInfoAndFProperty(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, size_t source, size_t target);
+    [[maybe_unused]] static void RemapAtlasInfoKeyInSequence(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, const std::set<size_t> & atlasIdxSet);
+    [[maybe_unused]] static size_t IntersectNum(const std::set<int> & edges0, const std::set<int> & edges1);
+    [[maybe_unused]] static bool IsIntersect(const std::set<int> & edges0, const std::set<int> & edges1);
+    [[maybe_unused]] static void SortAtlasSize(std::vector<std::pair<size_t, size_t>/*<atlasIdx, faceNum>*/> & atlasSizes);
+    [[maybe_unused]] static int32_t GetAtlasGenus(AtlasInfo * pAtlasInfo, size_t atlasIdx);
 
 private:
     TriMesh * m_pMesh;

@@ -1319,7 +1319,7 @@ bool TextureOptimizerV2::FurtherOptimize(const TriMesh * pMergedMesh, const Text
     return true;
 }
 
-void TextureOptimizerV2::MergeAtlasInfoAndFProperty(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, size_t source, size_t target)
+[[maybe_unused]] void TextureOptimizerV2::MergeAtlasInfoAndFProperty(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, size_t source, size_t target)
 {
     std::set<int> & atlasEdges1 = pAtlasInfo->atlasEdges[source];
     pAtlasInfo->atlasEdges[target].insert(atlasEdges1.begin(), atlasEdges1.end());
@@ -1344,7 +1344,7 @@ void TextureOptimizerV2::MergeAtlasInfoAndFProperty(AtlasInfo * pAtlasInfo, TriM
     pAtlasInfo->atlasNum--;
 }
 
-void TextureOptimizerV2::RemapAtlasInfoKeyInSequence(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, const std::set<size_t> & atlasIdxSet)
+[[maybe_unused]] void TextureOptimizerV2::RemapAtlasInfoKeyInSequence(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, const std::set<size_t> & atlasIdxSet)
 {
     std::unordered_map<size_t, size_t> atlasIdxRemap;
     size_t remappedIdx = 0;
@@ -1398,7 +1398,7 @@ void TextureOptimizerV2::RemapAtlasInfoKeyInSequence(AtlasInfo * pAtlasInfo, Tri
     pAtlasInfo->atlasHalfedges = std::move(newAtlasHalfedges);
 }
 
-size_t TextureOptimizerV2::IntersectNum(const std::set<int> & edges0, const std::set<int> & edges1)
+[[maybe_unused]] size_t TextureOptimizerV2::IntersectNum(const std::set<int> & edges0, const std::set<int> & edges1)
 {
     size_t intersectLength = 0;
     for (int edge0 : edges0)
@@ -1411,7 +1411,7 @@ size_t TextureOptimizerV2::IntersectNum(const std::set<int> & edges0, const std:
     return intersectLength;
 }
 
-bool TextureOptimizerV2::IsIntersect(const std::set<int> & edges0, const std::set<int> & edges1)
+[[maybe_unused]] bool TextureOptimizerV2::IsIntersect(const std::set<int> & edges0, const std::set<int> & edges1)
 {
     bool bConnected = false;
     for (int edge0 : edges0)
@@ -1425,7 +1425,7 @@ bool TextureOptimizerV2::IsIntersect(const std::set<int> & edges0, const std::se
     return bConnected;
 }
 
-void TextureOptimizerV2::SortAtlasSize(std::vector<std::pair<size_t, size_t>> & atlasSizes)
+[[maybe_unused]] void TextureOptimizerV2::SortAtlasSize(std::vector<std::pair<size_t, size_t>> & atlasSizes)
 {
     std::sort(atlasSizes.begin(), atlasSizes.end(),
     [](const std::pair<size_t, size_t> & lhs, std::pair<size_t, size_t> & rhs)
@@ -1434,7 +1434,7 @@ void TextureOptimizerV2::SortAtlasSize(std::vector<std::pair<size_t, size_t>> & 
     });
 }
 
-int32_t TextureOptimizerV2::GetAtlasGenus(AtlasInfo * pAtlasInfo, size_t atlasIdx)
+[[maybe_unused]] int32_t TextureOptimizerV2::GetAtlasGenus(AtlasInfo * pAtlasInfo, size_t atlasIdx)
 {
     size_t vertexNum = pAtlasInfo->atlasVertices[atlasIdx].size();
     size_t edgeNum = pAtlasInfo->atlasEdges[atlasIdx].size();

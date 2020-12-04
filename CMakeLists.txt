@@ -77,7 +77,8 @@ SET(SOURCE_FILES
         Sources/TextureOptimizerV2.cpp
         Sources/MeshUtils.cpp
         Sources/IglDebugViewer.cpp
-        Sources/ClusteringAlgorithm.cpp)
+        Sources/ClusteringAlgorithm.cpp
+        Sources/OMT.cpp)
 
 INCLUDE_DIRECTORIES(${INCLUDE_DIRS})
 
