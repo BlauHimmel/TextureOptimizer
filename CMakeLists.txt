@@ -82,7 +82,8 @@ SET(SOURCE_FILES
         Sources/MeshUtils.cpp
         Sources/IglDebugViewer.cpp
         Sources/ClusteringAlgorithm.cpp
-        Sources/OMT.cpp)
+        Sources/OMT.cpp
+        Sources/Shader.cpp)
 
 INCLUDE_DIRECTORIES(${INCLUDE_DIRS})
 
@@ -91,3 +92,6 @@ TARGET_LINK_LIBRARIES(TextureOptimizer ${EXT_LIBRARIES})
 
 ADD_EXECUTABLE(TextureOptimizerV2 MainTextureOptimizerV2.cpp ${SOURCE_FILES})
 TARGET_LINK_LIBRARIES(TextureOptimizerV2 ${EXT_LIBRARIES})
+
+ADD_EXECUTABLE(OMT2D MainOMT.cpp ${SOURCE_FILES})
+TARGET_LINK_LIBRARIES(OMT2D ${EXT_LIBRARIES})
