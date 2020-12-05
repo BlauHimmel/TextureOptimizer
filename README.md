@@ -1,3 +1,5 @@
+# Compile
+Architecture: amd64
 
 # Dependencies
 
