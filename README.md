@@ -1,6 +1,3 @@
-# Compile
-Architecture: amd64
-
 # Dependencies
 
 ### TBB
@@ -12,7 +9,7 @@ https://github.com/oneapi-src/oneTBB/releases
 ### OpenMesh, Eigen and GLFW3
 
 - Download source codes from the official website.
-- Complie them using CMake.
+- Compile them using CMake.
 - Install them using CMake.
 
 ### MKL
