@@ -26,7 +26,7 @@ private:
 
     struct Plane
     {
-        float a, b, c, padding;
+        float a, b, c, index;
     };
 
     static bool CheckInitParameterization(const TriMesh * pMesh);
@@ -34,7 +34,6 @@ private:
     static void InitTargetArea(const TriMesh * pMesh, std::vector<float> & targetAreas);
     static void InitPlaneEquation(const TriMesh * pMesh, std::vector<Plane> & planes);
     static void InitCellColor(const TriMesh * pMesh, std::vector<Color> & colors);
-    static void InitPlaneIndex(const TriMesh * pMesh, std::vector<float> & indices);
     static void DrawQuad();
 
     void DrawPowerDiagram();
@@ -48,7 +47,6 @@ private:
     std::vector<float> m_TargetAreas;
     std::vector<Plane> m_Planes;
     std::vector<Color> m_CellColors;
-    std::vector<float> m_PlaneIndices;
 
     GLuint m_TargetAreaBuffer = GLuint(-1);
     GLuint m_PlaneBuffer = GLuint(-1);
@@ -56,7 +54,6 @@ private:
     GLuint m_GradientBuffer = GLuint(-1);
     GLuint m_CellColorBuffer = GLuint(-1);
     GLuint m_CellPixelCountBuffer = GLuint(-1);
-    GLuint m_PlaneIndexBuffer = GLuint(-1);
 
     GLuint m_PowerDiagramFBO = GLuint(-1);
     GLuint m_PowerDiagramDepthRBO = GLuint(-1);

@@ -11,14 +11,13 @@ const char * pDrawPowerDiagramShaderVS = R"(
 #version 430 core
 layout(location = 0) in vec4 plane;
 layout(location = 1) in vec3 color;
-layout(location = 2) in float planeIndex;
 
 out vec4 vColor;
 
 void main()
 {
     gl_Position = vec4(plane.xyz, 1.0);
-    vColor = vec4(color, planeIndex);
+    vColor = vec4(color, plane.w);
 }
 )";
 
@@ -319,13 +318,6 @@ bool OMT2D::InitializeGPUBuffer()
     glBufferData(GL_SHADER_STORAGE_BUFFER, zeroBufferInt.size() * sizeof(int), zeroBufferInt.data(), GL_DYNAMIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
-    if (m_PlaneIndexBuffer != GLuint(-1)) { glDeleteBuffers(1, &m_PlaneIndexBuffer); }
-    glGenBuffers(1, &m_PlaneIndexBuffer);
-    InitPlaneIndex(m_pMesh, m_PlaneIndices);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_PlaneIndexBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, m_PlaneIndices.size() * sizeof(float), m_PlaneIndices.data(), GL_STATIC_DRAW);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-
     /*******************************************************************************************************/
 
     if (m_PowerDiagramTexture != GLuint(-1)) { glDeleteTextures(1, &m_PowerDiagramTexture); }
@@ -361,15 +353,11 @@ bool OMT2D::InitializeGPUBuffer()
 
     glBindBuffer(GL_ARRAY_BUFFER, m_PlaneBuffer);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Plane), nullptr);
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Plane), nullptr);
 
     glBindBuffer(GL_ARRAY_BUFFER, m_CellColorBuffer);
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Color), nullptr);
-
-    glBindBuffer(GL_ARRAY_BUFFER, m_PlaneIndexBuffer);
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(float), nullptr);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
@@ -542,7 +530,7 @@ void OMT2D::InitPlaneEquation(const TriMesh * pMesh, std::vector<Plane> & planes
         planes[vh.idx()].a = static_cast<float>(uv[0]);
         planes[vh.idx()].b = static_cast<float>(uv[1]);
         planes[vh.idx()].c = static_cast<float>(-0.5 * uv.squaredNorm());
-        planes[vh.idx()].padding = 0.0f;
+        planes[vh.idx()].index = static_cast<float>(vh.idx());
     }
 }
 
@@ -558,17 +546,6 @@ void OMT2D::InitCellColor(const TriMesh * pMesh, std::vector<Color> & colors)
         colors[i].r = uniform(engine);
         colors[i].g = uniform(engine);
         colors[i].b = uniform(engine);
-    }
-}
-
-void OMT2D::InitPlaneIndex(const TriMesh * pMesh, std::vector<float> & indices)
-{
-    indices.resize(pMesh->n_vertices(), 0);
-
-    int idx = 0;
-    for (const auto & vh : pMesh->vertices())
-    {
-        indices[idx++] = static_cast<float>(vh.idx());
     }
 }
 
