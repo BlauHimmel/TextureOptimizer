@@ -4,6 +4,40 @@
 #include <random>
 
 #include "Logger.hpp"
+#include "Timer.hpp"
+
+/*******************************************************************************************************/
+
+const char * pComputePlaneZRangeShaderVS = R"(
+#version 430 core
+layout(location = 0) in vec4 plane;
+
+out vec2 vZRange;
+
+void main()
+{
+    vec2 lb = vec2(-1.0, -1.0);
+    vec2 rb = vec2( 1.0, -1.0);
+    vec2 lt = vec2(-1.0,  1.0);
+    vec2 rt = vec2( 1.0,  1.0);
+
+    float zlb = plane.x * lb.x + plane.y * lb.y + plane.z;
+    float zrb = plane.x * rb.x + plane.y * rb.y + plane.z;
+    float zlt = plane.x * lt.x + plane.y * lt.y + plane.z;
+    float zrt = plane.x * rt.x + plane.y * rt.y + plane.z;
+
+    vZRange.x = zlb;
+    vZRange.x = min(vZRange.x, zrb);
+    vZRange.x = min(vZRange.x, zlt);
+    vZRange.x = min(vZRange.x, zrt);
+
+    vZRange.y = zlb;
+    vZRange.y = max(vZRange.y, zrb);
+    vZRange.y = max(vZRange.y, zlt);
+    vZRange.y = max(vZRange.y, zrt);
+}
+)";
+
 
 /*******************************************************************************************************/
 
@@ -254,6 +288,7 @@ bool OMT2D::InitializeOpenGL()
     }
 
     glfwMakeContextCurrent(m_pWindow);
+    glfwSwapInterval(0);
 
     glfwSetWindowAttrib(m_pWindow, GLFW_RESIZABLE, GLFW_FALSE);
     glfwSetWindowAttrib(m_pWindow, GLFW_MAXIMIZED , GLFW_FALSE);
@@ -317,6 +352,33 @@ bool OMT2D::InitializeGPUBuffer()
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_CellPixelCountBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, zeroBufferInt.size() * sizeof(int), zeroBufferInt.data(), GL_DYNAMIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+    /*******************************************************************************************************/
+
+    std::vector<float> zeroBufferFloat2(m_pMesh->n_vertices() * 2, 0.0f);
+
+    if (m_PlaneZRangeBuffer != GLuint(-1)) { glDeleteBuffers(1, &m_PlaneZRangeBuffer); }
+    glGenBuffers(1, &m_PlaneZRangeBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_PlaneZRangeBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, zeroBufferFloat2.size() * sizeof(float), zeroBufferFloat2.data(), GL_STATIC_READ);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+    if (m_PlaneZRangeVAO != GLuint(-1)) { glDeleteVertexArrays(1, &m_PlaneZRangeVAO); }
+    glGenVertexArrays(1, &m_PlaneZRangeVAO);
+    glBindVertexArray(m_PlaneZRangeVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, m_PlaneBuffer);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Plane), nullptr);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+
+    m_PlaneZRangeShader = std::make_unique<Shader>("Plane Z Range Shader");
+    m_PlaneZRangeShader->CompileShaderFromString(pComputePlaneZRangeShaderVS, ESHADER_TYPE_VERTEX);
+    const GLchar * pFeedbackVaryings[] = { "vZRange" };
+    glTransformFeedbackVaryings(m_PlaneZRangeShader->GetProgramID(), 1, pFeedbackVaryings, GL_INTERLEAVED_ATTRIBS);
+    m_PlaneZRangeShader->LinkProgram();
 
     /*******************************************************************************************************/
 
@@ -400,8 +462,26 @@ bool OMT2D::InitializeGPUBuffer()
 
 void OMT2D::Run(float step)
 {
+    Timer fpsTimer, totalTimer;
+    fpsTimer.Reset();
+    totalTimer.Reset();
+    double frameCount = 0.0;
+
     while (!glfwWindowShouldClose(m_pWindow))
     {
+        frameCount += 1.0;
+        if (fpsTimer.Elapsed() >= 1000.0)
+        {
+            m_FPS = static_cast<uint32_t>(frameCount * 1000.0 / fpsTimer.Elapsed());
+            frameCount = 0.0;
+            fpsTimer.Reset();
+
+            std::string title = Logger::Format("%u Iterations / Sec, Error = %.8lf , Missing point: %u Elapse: %s.",
+                m_FPS, ComputeError(), ComputeMissingPointNum(), totalTimer.ElapsedString(true).c_str());
+            glfwSetWindowTitle(m_pWindow, title.c_str());
+        }
+
+        ComputePlaneZRange();
         DrawPowerDiagram();
         ComputeCellStats();
         UpdatePlane(step);
@@ -595,6 +675,36 @@ void OMT2D::DrawQuad()
     glBindVertexArray(0);
 }
 
+void OMT2D::ComputePlaneZRange()
+{
+    m_PlaneZRangeShader->UseProgram();
+
+    glEnable(GL_RASTERIZER_DISCARD);
+    glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, m_PlaneZRangeBuffer);
+    glBeginTransformFeedback(GL_POINTS);
+    glBindVertexArray(m_PlaneZRangeVAO);
+    glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(m_pMesh->n_vertices()));
+    glBindVertexArray(0);
+    glEndTransformFeedback();
+    glDisable(GL_RASTERIZER_DISCARD);
+    glFlush();
+
+    glBindBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, m_PlaneZRangeBuffer);
+    void * pRange = glMapBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, GL_READ_ONLY);
+    float zMin =  std::numeric_limits<float>::max();
+    float zMax = -std::numeric_limits<float>::max();
+    for (size_t i = 0; i < m_pMesh->n_vertices() * 2; i += 2)
+    {
+        zMin = std::min(zMin, reinterpret_cast<float *>(pRange)[i + 0]);
+        zMax = std::max(zMax, reinterpret_cast<float *>(pRange)[i + 1]);
+    }
+    glUnmapBuffer(GL_TRANSFORM_FEEDBACK_BUFFER);
+    glBindBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, 0);
+
+    m_ViewMatrix = glm::lookAt(glm::vec3(0.0f, 0.0f, zMax), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    m_ProjectionMatrix = glm::ortho(-1.0f, 1.0f, -1.0f, 1.0f, 0.0f, zMax - zMin);
+}
+
 void OMT2D::DrawPowerDiagram()
 {
     glEnable(GL_DEPTH_TEST);
@@ -660,6 +770,36 @@ void OMT2D::UpdatePlane(float step)
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, m_GradientBuffer);
     glDispatchCompute(static_cast<GLuint>(m_pMesh->n_vertices() / 32 + 1), 1u, 1u);
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
+}
+
+float OMT2D::ComputeError()
+{
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_GradientBuffer);
+    void * pGradient = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+    float error = 0.0f;
+    for (size_t i = 0; i < m_pMesh->n_vertices(); i++)
+    {
+        float gradient = reinterpret_cast<float *>(pGradient)[i];
+        error += gradient * gradient;
+    }
+    glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    return error;
+}
+
+uint32_t OMT2D::ComputeMissingPointNum()
+{
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_CurrentAreaBuffer);
+    void * pCurrArea = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+    uint32_t num = 0;
+    for (size_t i = 0; i < m_pMesh->n_vertices(); i++)
+    {
+        float currArea = reinterpret_cast<float *>(pCurrArea)[i];
+        if (currArea == 0.0f) { num++; }
+    }
+    glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    return num;
 }
 
 

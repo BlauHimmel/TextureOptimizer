@@ -1,4 +1,4 @@
-#include "Shader.h"
+#include "Shader.hpp"
 
 #include <fstream>
 #include <sstream>
@@ -14,6 +14,11 @@ Shader::Shader(const std::string & shaderName)
 Shader::~Shader()
 {
     glDeleteProgram(m_ProgramID);
+}
+
+GLuint Shader::GetProgramID() const
+{
+    return m_ProgramID;
 }
 
 bool Shader::CompileShaderFromFile(const std::string & filename, E_SHADER_TYPE type)

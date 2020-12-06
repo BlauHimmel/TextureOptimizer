@@ -18,8 +18,10 @@ enum E_SHADER_TYPE
 class Shader
 {
 public:
-    Shader(const std::string & shaderName);
+    explicit Shader(const std::string & shaderName);
     ~Shader();
+
+    GLuint GetProgramID() const;
 
     bool CompileShaderFromFile(const std::string & filename, E_SHADER_TYPE type);
     bool CompileShaderFromString(const std::string & code, E_SHADER_TYPE type);

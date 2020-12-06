@@ -83,7 +83,8 @@ SET(SOURCE_FILES
         Sources/IglDebugViewer.cpp
         Sources/ClusteringAlgorithm.cpp
         Sources/OMT.cpp
-        Sources/Shader.cpp)
+        Sources/Shader.cpp
+        Sources/Timer.cpp)
 
 INCLUDE_DIRECTORIES(${INCLUDE_DIRS})
 

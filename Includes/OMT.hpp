@@ -6,7 +6,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "Declaration.hpp"
-#include "Shader.h"
+#include "Shader.hpp"
 
 class OMT2D
 {
@@ -36,13 +36,17 @@ private:
     static void InitCellColor(const TriMesh * pMesh, std::vector<Color> & colors);
     static void DrawQuad();
 
+    void ComputePlaneZRange();
     void DrawPowerDiagram();
     void ComputeCellStats();
     void UpdatePlane(float step);
+    float ComputeError();
+    uint32_t ComputeMissingPointNum();
 
 private:
     TriMesh * m_pMesh = nullptr;
     GLFWwindow * m_pWindow = nullptr;
+    uint32_t m_FPS = 0u;
 
     std::vector<float> m_TargetAreas;
     std::vector<Plane> m_Planes;
@@ -54,6 +58,10 @@ private:
     GLuint m_GradientBuffer = GLuint(-1);
     GLuint m_CellColorBuffer = GLuint(-1);
     GLuint m_CellPixelCountBuffer = GLuint(-1);
+
+    GLuint m_PlaneZRangeBuffer = GLuint(-1);
+    GLuint m_PlaneZRangeVAO = GLuint(-1);
+    std::unique_ptr<Shader> m_PlaneZRangeShader;
 
     GLuint m_PowerDiagramFBO = GLuint(-1);
     GLuint m_PowerDiagramDepthRBO = GLuint(-1);
@@ -68,16 +76,16 @@ private:
 
     std::unique_ptr<Shader> m_UpdatePlaneShader;
 
-    const int m_ClientWidth = 1000;
-    const int m_ClientHeight = 1000;
+    const int m_ClientWidth = 800;
+    const int m_ClientHeight = 800;
     const int m_RenderTargetWidth = 2000;
     const int m_RenderTargetHeight = 2000;
 
-    const float m_ZNear = 0.01f;
-    const float m_ZFar= 300.0f;
+    const float m_InitialZNear = 0.01f;
+    const float m_InitialZFar= 1000.0f;
     glm::mat4 m_ModelMatrix = glm::mat4(1.0f);
     glm::mat4 m_ViewMatrix = glm::lookAt(glm::vec3(0.0f, 0.0f, 100.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    glm::mat4 m_ProjectionMatrix = glm::ortho(-1.0f, 1.0f, -1.0f, 1.0f, m_ZNear, m_ZFar);
+    glm::mat4 m_ProjectionMatrix = glm::ortho(-1.0f, 1.0f, -1.0f, 1.0f, m_InitialZNear, m_InitialZFar);
 };
 
 #endif //OMT_HPP
