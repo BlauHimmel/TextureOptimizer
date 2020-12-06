@@ -271,7 +271,7 @@ bool OMT2D::InitializeOpenGL()
 
 bool OMT2D::InitializeGPUBuffer()
 {
-    if (!CheckInitParamterization(m_pMesh)) { return false; }
+    if (!CheckInitParameterization(m_pMesh)) { return false; }
     NormalizeUVToUnitSquare(m_pMesh);
 
     /*******************************************************************************************************/
@@ -280,7 +280,7 @@ bool OMT2D::InitializeGPUBuffer()
     glGenBuffers(1, &m_TargetAreaBuffer);
     InitTargetArea(m_pMesh, m_TargetAreas);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_TargetAreaBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, m_TargetAreas.size() * sizeof(float), m_TargetAreas.data(), GL_DYNAMIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, m_TargetAreas.size() * sizeof(float), m_TargetAreas.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
     if (m_PlaneBuffer != GLuint(-1)) { glDeleteBuffers(1, &m_PlaneBuffer); }
@@ -424,7 +424,7 @@ void OMT2D::Run(float step)
     glfwTerminate();
 }
 
-bool OMT2D::CheckInitParamterization(const TriMesh * pMesh)
+bool OMT2D::CheckInitParameterization(const TriMesh * pMesh)
 {
     if (!pMesh->has_vertex_texcoords2D())
     {
@@ -682,7 +682,7 @@ void OMT2D::UpdatePlane(float step)
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_PlaneBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, m_GradientBuffer);
     glDispatchCompute(static_cast<GLuint>(m_pMesh->n_vertices() / 32 + 1), 1u, 1u);
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
 }
 
 

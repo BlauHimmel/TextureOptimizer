@@ -29,7 +29,7 @@ private:
         float a, b, c, padding;
     };
 
-    static bool CheckInitParamterization(const TriMesh * pMesh);
+    static bool CheckInitParameterization(const TriMesh * pMesh);
     static void NormalizeUVToUnitSquare(TriMesh * pMesh);
     static void InitTargetArea(const TriMesh * pMesh, std::vector<float> & targetAreas);
     static void InitPlaneEquation(const TriMesh * pMesh, std::vector<Plane> & planes);
