@@ -3,6 +3,8 @@
 #include <memory>
 #include <random>
 
+#include <HLBFGS.h>
+
 #include "Logger.hpp"
 #include "Timer.hpp"
 
@@ -212,7 +214,7 @@ void main()
 	{
         float totalTargetArea = 4.0;
         currArea[x] = float(pixelCount[x]) / float(powerDiagramMapWidth * powerDiagramMapHeight) * totalTargetArea;
-        grad[x] = targArea[x] - currArea[x];
+        grad[x] = currArea[x] - targArea[x];
     }
 }
 )";
@@ -239,15 +241,52 @@ void main()
     int x = int(gl_GlobalInvocationID.x);
     if (x < cellNum)
 	{
-        p[x].z += (grad[x] * step);
+        p[x].z -= (grad[x] * step);
     }
 }
 )";
 
 /*******************************************************************************************************/
+/* Used for HLBFGS */
+OMT2D * g_pGlobalPointer = nullptr;
+
+/* Used for HLBFGS */
+void EVALFUNC(int N, double * X, double * PREV_X, double * F, double * G)
+{
+    g_pGlobalPointer->SetPlaneParamToGPUBuffer(X);
+    g_pGlobalPointer->ComputePlaneZRange();
+    g_pGlobalPointer->DrawPowerDiagramBack();
+    g_pGlobalPointer->ComputeCellStats();
+    g_pGlobalPointer->ComputeGradientAndFunctionValFromGPUBuffer(G, F);
+}
+
+/* Used for HLBFGS */
+void NEWITERATION(int ITER, int CALL_ITER, double * X, double * F, double * G, double * GNORM)
+{
+    g_pGlobalPointer->GLFWLoopBegin();
+    g_pGlobalPointer->DrawPowerDiagramScreen();
+    g_pGlobalPointer->GLFWLoopEnd();
+
+    Logger::Info("HLBFGS: Iterations: %d, Error = %lf, Missing Point = %u", ITER, g_pGlobalPointer->ComputeError(), g_pGlobalPointer->ComputeMissingPointNum());
+
+    if (g_pGlobalPointer->GLFWShouldClose())
+    {
+        /* Stop the iteration manually. */
+        g_pGlobalPointer->INFO[4] = g_pGlobalPointer->INFO[2];
+        return;
+    }
+}
+
+/*******************************************************************************************************/
 
 bool OMT2D::Initialize()
 {
+    if (g_pGlobalPointer != nullptr)
+    {
+        Logger::Error("Multiple OMT2D class running at the same time!");
+        return false;
+    }
+
     if (!InitializeOpenGL())
     {
         Logger::Error("Failed to initialize OpenGL.");
@@ -258,6 +297,46 @@ bool OMT2D::Initialize()
         Logger::Error("Failed to initialize GPU buffers.");
         return false;
     }
+
+    /* Init HLBFGS parameters. */
+    INIT_HLBFGS(PARAMETER, INFO);
+    /* function tolerance used in line-search. */
+    PARAMETER[0] = 1.0e-12;
+    /* variable tolerance used in line-search. */
+    PARAMETER[1] = 1.0e-16;
+    /* gradient tolerance used in line-search. */
+    PARAMETER[2] = 0.9999;
+    /* Minimum step. */
+    PARAMETER[3] = 1.0e-20;
+    /* Maximum step. */
+    PARAMETER[4] = 1.0e20;
+    /* The stop criterion ( ||G||/max(1,||X||) < PARAMETER[5] */
+    PARAMETER[5] = 0.0;
+    /* The stop criterion ( ||G|| < PARAMETER[6] ) */
+    PARAMETER[6] = 0.0;
+    /* the max number of evaluation in line-search */
+    INFO[0] = 20;
+    /* The LBFGS strategy. 0: standard, 1 : M1QN3 strategy[8](recommended). */
+    INFO[3] = 1;
+    /* The max number of iterations */
+    INFO[4] = 100000;
+    /* 1: print message, 0: do nothing */
+    INFO[5] = 0;
+    /* The update interval of Hessian. (typical choices : 0 - 200) */
+    INFO[6] = 0;
+    /* 0 : without hessian, 1 : with accurate hessian */
+    INFO[7] = 0;
+    /* 0: Disable preconditioned CG; 1: Enable preconditioned CG */
+    INFO[10] = 0;
+
+    /* Optimized variable */
+    Variable.resize(m_pMesh->n_vertices(), 0.0);
+    for (size_t i = 0; i < m_Planes.size(); i++)
+    {
+        Variable[i] = m_Planes[i].c;
+    }
+
+    g_pGlobalPointer = this;
 
     return true;
 }
@@ -460,8 +539,10 @@ bool OMT2D::InitializeGPUBuffer()
     return true;
 }
 
-void OMT2D::Run(float step)
+void OMT2D::Run()
 {
+    HLBFGS(int(m_pMesh->n_vertices()), M, Variable.data(), EVALFUNC, nullptr, HLBFGS_UPDATE_Hessian, NEWITERATION, PARAMETER, INFO);
+
     Timer fpsTimer, totalTimer;
     fpsTimer.Reset();
     totalTimer.Reset();
@@ -476,20 +557,80 @@ void OMT2D::Run(float step)
             frameCount = 0.0;
             fpsTimer.Reset();
 
-            std::string title = Logger::Format("%u Iterations / Sec, Error = %.8lf , Missing point: %u Elapse: %s.",
+            std::string title = Logger::Format("OMT %u Iterations / Sec, Error = %.8lf , Missing point: %u Elapse: %s.",
                 m_FPS, ComputeError(), ComputeMissingPointNum(), totalTimer.ElapsedString(true).c_str());
             glfwSetWindowTitle(m_pWindow, title.c_str());
         }
 
         ComputePlaneZRange();
-        DrawPowerDiagram();
+        DrawPowerDiagramBack();
+        DrawPowerDiagramScreen();
         ComputeCellStats();
-        UpdatePlane(step);
+        UpdatePlane(0.02f);
         glfwSwapBuffers(m_pWindow);
         glfwPollEvents();
     }
 
+
     glfwTerminate();
+    g_pGlobalPointer = nullptr;
+}
+
+void OMT2D::SetPlaneParamToGPUBuffer(const double * X)
+{
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_PlaneBuffer);
+    auto * pPlane = reinterpret_cast<Plane *>(glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_WRITE));
+    for (size_t i = 0; i < m_pMesh->n_vertices(); i++)
+    {
+        pPlane[i].c = static_cast<float>(X[i]);
+    }
+    glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
+}
+
+void OMT2D::ComputeGradientAndFunctionValFromGPUBuffer(double * G, double * F)
+{
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_GradientBuffer);
+    void * pGradient = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+    *F = 0.0;
+    for (size_t i = 0; i < m_pMesh->n_vertices(); i++)
+    {
+        float gradient = reinterpret_cast<float *>(pGradient)[i];
+        G[i] = static_cast<double>(gradient);
+        *F += (G[i] * G[i]);
+    }
+    glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+}
+
+void OMT2D::GLFWLoopBegin()
+{
+    static Timer fpsTimer, totalTimer;
+    static double frameCount = 0.0;
+
+    frameCount += 1.0;
+    if (fpsTimer.Elapsed() >= 1000.0)
+    {
+        m_FPS = static_cast<uint32_t>(frameCount * 1000.0 / fpsTimer.Elapsed());
+        frameCount = 0.0;
+        fpsTimer.Reset();
+
+        std::string title = Logger::Format("OMT %u Iterations / Sec, Error = %.8lf , Missing point: %u Elapse: %s.",
+            m_FPS, ComputeError(), ComputeMissingPointNum(), totalTimer.ElapsedString(true).c_str());
+        glfwSetWindowTitle(m_pWindow, title.c_str());
+    }
+}
+
+void OMT2D::GLFWLoopEnd()
+{
+    glfwSwapBuffers(m_pWindow);
+    glfwPollEvents();
+}
+
+bool OMT2D::GLFWShouldClose()
+{
+    return glfwWindowShouldClose(m_pWindow);
 }
 
 bool OMT2D::CheckInitParameterization(const TriMesh * pMesh)
@@ -688,6 +829,7 @@ void OMT2D::ComputePlaneZRange()
     glEndTransformFeedback();
     glDisable(GL_RASTERIZER_DISCARD);
     glFlush();
+    glMemoryBarrier(GL_TRANSFORM_FEEDBACK_BARRIER_BIT);
 
     glBindBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, m_PlaneZRangeBuffer);
     void * pRange = glMapBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, GL_READ_ONLY);
@@ -705,7 +847,7 @@ void OMT2D::ComputePlaneZRange()
     m_ProjectionMatrix = glm::ortho(-1.0f, 1.0f, -1.0f, 1.0f, 0.0f, zMax - zMin);
 }
 
-void OMT2D::DrawPowerDiagram()
+void OMT2D::DrawPowerDiagramBack()
 {
     glEnable(GL_DEPTH_TEST);
 
@@ -720,6 +862,11 @@ void OMT2D::DrawPowerDiagram()
     glBindVertexArray(m_PowerDiagramVAO);
     glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(m_pMesh->n_vertices()));
     glBindVertexArray(0);
+}
+
+void OMT2D::DrawPowerDiagramScreen()
+{
+    glEnable(GL_DEPTH_TEST);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     m_QuadShader->UseProgram();
@@ -780,7 +927,7 @@ float OMT2D::ComputeError()
     for (size_t i = 0; i < m_pMesh->n_vertices(); i++)
     {
         float gradient = reinterpret_cast<float *>(pGradient)[i];
-        error += gradient * gradient;
+        error += (gradient * gradient);
     }
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);

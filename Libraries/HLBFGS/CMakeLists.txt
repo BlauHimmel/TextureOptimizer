@@ -1,0 +1,30 @@
+CMAKE_MINIMUM_REQUIRED(VERSION 3.12)
+PROJECT(HLBFGS)
+
+SET(CMAKE_CXX_STANDARD 17)
+SET(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+ADD_DEFINITIONS(-D _USE_MATH_DEFINES)
+ADD_DEFINITIONS(-D _CRT_SECURE_NO_WARNINGS)
+ADD_DEFINITIONS(-D _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS)
+ADD_DEFINITIONS(-D NOMINMAX)
+
+SET(INCLUDE_DIRS include)
+
+SET(SOURCE_FILES
+        include/HLBFGS.h
+        include/HLBFGS_BLAS.h
+        include/ICFS.h
+        include/LineSearch.h
+        include/Lite_Sparse_Matrix.h
+        include/Sparse_Entry.h
+
+        src/HLBFGS.cpp
+        src/HLBFGS_BLAS.cpp
+        src/ICFS.cpp
+        src/LineSearch.cpp
+        src/Lite_Sparse_Matrix.cpp)
+
+INCLUDE_DIRECTORIES(${INCLUDE_DIRS})
+
+ADD_LIBRARY(${PROJECT_NAME} ${SOURCE_FILES})

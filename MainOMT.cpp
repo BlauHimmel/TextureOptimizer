@@ -14,12 +14,10 @@ int main(int argc, const char ** argv)
 
     bool bShowHelp = false;
     std::string meshFilename, outputFilename;
-    float step;
 
     auto cli = lyra::help(bShowHelp)
         | lyra::opt(meshFilename, "mesh")["-m"]["--mesh"]("File name of the input mesh").required()
-        | lyra::opt(outputFilename, "output")["-o"]["--output"]("Directory of the output files.").required()
-        | lyra::opt(step, "step")["-s"]["--step"]("Optimization step.").required();
+        | lyra::opt(outputFilename, "output")["-o"]["--output"]("Directory of the output files.").required();
 
     auto result = cli.parse( {argc, argv} );
     if (!result)
@@ -79,7 +77,7 @@ int main(int argc, const char ** argv)
         return 1;
     }
 
-    omt.Run(step);
+    omt.Run();
 
     /* ************************ run OMT ************************ */
 

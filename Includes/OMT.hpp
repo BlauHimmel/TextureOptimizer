@@ -16,7 +16,27 @@ public:
     bool Initialize();
     bool InitializeOpenGL();
     bool InitializeGPUBuffer();
-    void Run(float step);
+    void Run();
+
+public:
+    /* Used for HLBFGS */
+    void SetPlaneParamToGPUBuffer(const double * X);
+    /* Used for HLBFGS */
+    void ComputeGradientAndFunctionValFromGPUBuffer(double * G, double * F);
+    /* Used for HLBFGS */
+    void GLFWLoopBegin();
+    /* Used for HLBFGS */
+    void GLFWLoopEnd();
+    /* Used for HLBFGS */
+    bool GLFWShouldClose();
+    /* Used for HLBFGS */
+    double PARAMETER[20] = { 0.0 };
+    /* Used for HLBFGS */
+    int INFO[20] = { 0 };
+    /* Used for HLBFGS */
+    int M = 5;
+    /* Used for HLBFGS */
+    std::vector<double> Variable;
 
 private:
     struct Color
@@ -36,9 +56,11 @@ private:
     static void InitCellColor(const TriMesh * pMesh, std::vector<Color> & colors);
     static void DrawQuad();
 
-    void ComputePlaneZRange();
-    void DrawPowerDiagram();
-    void ComputeCellStats();
+public:
+    void ComputePlaneZRange()/* compute the (minZ, maxZ) for all of the planes */;
+    void DrawPowerDiagramBack()/* render on the backend render target */;
+    void DrawPowerDiagramScreen()/* render a quad using backend render target */;
+    void ComputeCellStats()/* current area and gradient */;
     void UpdatePlane(float step);
     float ComputeError();
     uint32_t ComputeMissingPointNum();
