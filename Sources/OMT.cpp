@@ -231,21 +231,42 @@ layout (std430, binding = 1) buffer gradient
 {
     float grad[];
 };
+layout (std430, binding = 2) buffer adamMomentum1
+{
+    float momentum1[];
+};
+layout (std430, binding = 3) buffer adamMomentum2
+{
+    float momentum2[];
+};
 
 uniform int cellNum;
-uniform float step;
+uniform float t;
+uniform float beta1;
+uniform float beta2;
+uniform float epsilon;
+uniform float alpha;
 
 void main()
 {
     int x = int(gl_GlobalInvocationID.x);
     if (x < cellNum)
 	{
-        p[x].z -= (grad[x] * step);
+        momentum1[x] = beta1 * momentum1[x] + (1.0 - beta1) * grad[x];
+        momentum2[x] = beta2 * momentum2[x] + (1.0 - beta2) * grad[x] * grad[x];
+
+        float momentum1Hat = momentum1[x] / (1.0 - pow(beta1, t));
+        float momentum2Hat = momentum2[x] / (1.0 - pow(beta2, t));
+
+        float u = momentum1Hat / (sqrt(momentum2Hat) + epsilon);
+
+        p[x].z -= (u * alpha);
     }
 }
 )";
 
 /*******************************************************************************************************/
+
 /* Used for HLBFGS */
 OMT2D * g_pGlobalPointer = nullptr;
 
@@ -514,6 +535,18 @@ bool OMT2D::InitializeGPUBuffer()
 
     /*******************************************************************************************************/
 
+    if (m_AdamMomentum1Buffer != GLuint(-1)) { glDeleteBuffers(1, &m_AdamMomentum1Buffer); }
+    glGenBuffers(1, &m_AdamMomentum1Buffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_AdamMomentum1Buffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, zeroBufferFloat.size() * sizeof(float), zeroBufferFloat.data(), GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+    if (m_AdamMomentum2Buffer != GLuint(-1)) { glDeleteBuffers(1, &m_AdamMomentum2Buffer); }
+    glGenBuffers(1, &m_AdamMomentum2Buffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_AdamMomentum2Buffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, zeroBufferFloat.size() * sizeof(float), zeroBufferFloat.data(), GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
     m_UpdatePlaneShader = std::make_unique<Shader>("Update Plane Shader");
     m_UpdatePlaneShader->CompileShaderFromString(pUpdatePlaneShaderCS, ESHADER_TYPE_COMPUTE);
     m_UpdatePlaneShader->LinkProgram();
@@ -540,8 +573,7 @@ void OMT2D::Run()
     SetVariableFromGPUBuffer();
     HLBFGS(int(m_pMesh->n_vertices()), M, Variable.data(), EVALFUNC, nullptr, HLBFGS_UPDATE_Hessian, NEWITERATION, PARAMETER, INFO);
 
-    float step = 0.02f;
-
+    int32_t iterations = 1;
     while (!glfwWindowShouldClose(m_pWindow))
     {
         GLFWLoopBegin();
@@ -550,7 +582,7 @@ void OMT2D::Run()
         DrawPowerDiagramBack();
         DrawPowerDiagramScreen();
         ComputeCellStats();
-        UpdatePlane(step);
+        UpdatePlane(iterations++);
 
         GLFWLoopEnd();
     }
@@ -901,13 +933,19 @@ void OMT2D::ComputeCellStats()
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 }
 
-void OMT2D::UpdatePlane(float step)
+void OMT2D::UpdatePlane(int iterations)
 {
     m_UpdatePlaneShader->UseProgram();
     m_UpdatePlaneShader->SetInt("cellNum", static_cast<int>(m_pMesh->n_vertices()));
-    m_UpdatePlaneShader->SetFloat("step", step);
+    m_UpdatePlaneShader->SetFloat("t", static_cast<float>(iterations));
+    m_UpdatePlaneShader->SetFloat("beta1", m_Beta1);
+    m_UpdatePlaneShader->SetFloat("beta2", m_Beta2);
+    m_UpdatePlaneShader->SetFloat("epsilon", m_Epsilon);
+    m_UpdatePlaneShader->SetFloat("alpha", m_Alpha);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_PlaneBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, m_GradientBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, m_AdamMomentum1Buffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, m_AdamMomentum2Buffer);
     glDispatchCompute(static_cast<GLuint>(m_pMesh->n_vertices() / 32 + 1), 1u, 1u);
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
 }
