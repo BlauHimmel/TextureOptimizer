@@ -7,6 +7,7 @@
 
 #include "Declaration.hpp"
 #include "Shader.hpp"
+#include "Timer.hpp"
 
 class OMT2D
 {
@@ -29,6 +30,8 @@ public:
     void GLFWLoopEnd();
     /* Used for HLBFGS */
     bool GLFWShouldClose();
+    /* Used for HLBFGS */
+    void SetVariableFromGPUBuffer();
     /* Used for HLBFGS */
     double PARAMETER[20] = { 0.0 };
     /* Used for HLBFGS */
@@ -68,10 +71,13 @@ public:
 private:
     TriMesh * m_pMesh = nullptr;
     GLFWwindow * m_pWindow = nullptr;
+
     uint32_t m_FPS = 0u;
+    Timer m_FPSTimer, m_TotalTimer;
+    double m_FrameCount = 0.0f;
 
     std::vector<float> m_TargetAreas;
-    std::vector<Plane> m_Planes;
+    std::vector<Plane> m_InitialPlanes;
     std::vector<Color> m_CellColors;
 
     GLuint m_TargetAreaBuffer = GLuint(-1);

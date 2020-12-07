@@ -6,7 +6,6 @@
 #include <HLBFGS.h>
 
 #include "Logger.hpp"
-#include "Timer.hpp"
 
 /*******************************************************************************************************/
 
@@ -323,13 +322,6 @@ bool OMT2D::Initialize()
     /* 0: Disable preconditioned CG; 1: Enable preconditioned CG */
     INFO[10] = 0;
 
-    /* Optimized variable */
-    Variable.resize(m_pMesh->n_vertices(), 0.0);
-    for (size_t i = 0; i < m_Planes.size(); i++)
-    {
-        Variable[i] = m_Planes[i].c;
-    }
-
     return true;
 }
 
@@ -390,9 +382,9 @@ bool OMT2D::InitializeGPUBuffer()
 
     if (m_PlaneBuffer != GLuint(-1)) { glDeleteBuffers(1, &m_PlaneBuffer); }
     glGenBuffers(1, &m_PlaneBuffer);
-    InitPlaneEquation(m_pMesh, m_Planes);
+    InitPlaneEquation(m_pMesh, m_InitialPlanes);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_PlaneBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, m_Planes.size() * sizeof(Plane), m_Planes.data(), GL_DYNAMIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, m_InitialPlanes.size() * sizeof(Plane), m_InitialPlanes.data(), GL_DYNAMIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
     std::vector<float> zeroBufferFloat(m_pMesh->n_vertices(), 0.0f);
@@ -541,36 +533,27 @@ void OMT2D::Run()
 
     g_pGlobalPointer = this;
 
+    m_FPSTimer.Reset();
+    m_TotalTimer.Reset();
+    m_FrameCount = 0.0;
+
+    SetVariableFromGPUBuffer();
     HLBFGS(int(m_pMesh->n_vertices()), M, Variable.data(), EVALFUNC, nullptr, HLBFGS_UPDATE_Hessian, NEWITERATION, PARAMETER, INFO);
 
-    Timer fpsTimer, totalTimer;
-    fpsTimer.Reset();
-    totalTimer.Reset();
-    double frameCount = 0.0;
+    float step = 0.02f;
 
     while (!glfwWindowShouldClose(m_pWindow))
     {
-        frameCount += 1.0;
-        if (fpsTimer.Elapsed() >= 1000.0)
-        {
-            m_FPS = static_cast<uint32_t>(frameCount * 1000.0 / fpsTimer.Elapsed());
-            frameCount = 0.0;
-            fpsTimer.Reset();
-
-            std::string title = Logger::Format("OMT %u Iterations / Sec, Error = %.8lf , Missing point: %u Elapse: %s.",
-                m_FPS, ComputeError(), ComputeMissingPointNum(), totalTimer.ElapsedString(true).c_str());
-            glfwSetWindowTitle(m_pWindow, title.c_str());
-        }
+        GLFWLoopBegin();
 
         ComputePlaneZRange();
         DrawPowerDiagramBack();
         DrawPowerDiagramScreen();
         ComputeCellStats();
-        UpdatePlane(0.02f);
-        glfwSwapBuffers(m_pWindow);
-        glfwPollEvents();
-    }
+        UpdatePlane(step);
 
+        GLFWLoopEnd();
+    }
 
     glfwTerminate();
     g_pGlobalPointer = nullptr;
@@ -583,7 +566,6 @@ void OMT2D::SetPlaneParamToGPUBuffer(const double * X)
     for (size_t i = 0; i < m_pMesh->n_vertices(); i++)
     {
         pPlane[i].c = static_cast<float>(X[i]);
-        m_Planes[i].c = static_cast<float>(X[i]);
     }
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
@@ -607,18 +589,15 @@ void OMT2D::ComputeGradientAndFunctionValFromGPUBuffer(double * G, double * F)
 
 void OMT2D::GLFWLoopBegin()
 {
-    static Timer fpsTimer, totalTimer;
-    static double frameCount = 0.0;
-
-    frameCount += 1.0;
-    if (fpsTimer.Elapsed() >= 1000.0)
+    m_FrameCount += 1.0;
+    if (m_FPSTimer.Elapsed() >= 1000.0)
     {
-        m_FPS = static_cast<uint32_t>(frameCount * 1000.0 / fpsTimer.Elapsed());
-        frameCount = 0.0;
-        fpsTimer.Reset();
+        m_FPS = static_cast<uint32_t>(m_FrameCount * 1000.0 / m_FPSTimer.Elapsed());
+        m_FrameCount = 0.0;
+        m_FPSTimer.Reset();
 
         std::string title = Logger::Format("OMT %u Iterations / Sec, Error = %.8lf , Missing point: %u Elapse: %s.",
-            m_FPS, ComputeError(), ComputeMissingPointNum(), totalTimer.ElapsedString(true).c_str());
+            m_FPS, ComputeError(), ComputeMissingPointNum(), m_TotalTimer.ElapsedString(true).c_str());
         glfwSetWindowTitle(m_pWindow, title.c_str());
     }
 }
@@ -632,6 +611,19 @@ void OMT2D::GLFWLoopEnd()
 bool OMT2D::GLFWShouldClose()
 {
     return glfwWindowShouldClose(m_pWindow);
+}
+
+void OMT2D::SetVariableFromGPUBuffer()
+{
+    Variable.resize(m_pMesh->n_vertices(), 0.0);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_PlaneBuffer);
+    auto * pPlane = reinterpret_cast<Plane *>(glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY));
+    for (size_t i = 0; i < m_pMesh->n_vertices(); i++)
+    {
+        Variable[i] = pPlane[i].c;
+    }
+    glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
 bool OMT2D::CheckInitParameterization(const TriMesh * pMesh)
