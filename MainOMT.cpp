@@ -81,5 +81,20 @@ int main(int argc, const char ** argv)
 
     /* ************************ run OMT ************************ */
 
+    /* ************************ write mesh ************************ */
+
+    OpenMesh::IO::Options wOpts;
+    wOpts += OpenMesh::IO::Options::VertexTexCoord;
+
+    Logger::Info("Writing mesh...");
+    if (!OpenMesh::IO::write_mesh(mesh, meshOutput, wOpts))
+    {
+        Logger::Error("Could not write mesh: \"%s\"!", meshOutput.c_str());
+        return 1;
+    }
+    Logger::Info("Successfully write mesh: \"%s\"!", meshOutput.c_str());
+
+    /* ************************ write mesh ************************ */
+
     return 0;
 }

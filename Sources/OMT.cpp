@@ -154,7 +154,6 @@ void main()
         pixelCount[x] = 0;
     }
 }
-
 )";
 
 const char * pComputeCellPixelCountShaderCS = R"(
@@ -271,6 +270,60 @@ void main()
             float u = momentum1Hat;
             p[x].z -= (u * alpha);
         }
+    }
+}
+)";
+
+/*******************************************************************************************************/
+
+const char * pComputeCellSiteResetShaderCS = R"(
+#version 430 core
+layout (local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+layout (std430, binding = 0) buffer cellPositionAccumulate
+{
+    ivec2 accu[];
+};
+
+uniform int cellNum;
+
+void main()
+{
+    int x = int(gl_GlobalInvocationID.x);
+    if (x < cellNum)
+	{
+        accu[x].x = 0;
+        accu[x].y = 0;
+    }
+}
+)";
+
+const char * pComputeCellSiteShaderCS = R"(
+#version 430 core
+layout (local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+
+layout (rgba32f, binding = 0) uniform image2D powerDiagramMap;
+layout (std430, binding = 1) buffer cellPixelCount
+{
+    int pixelCount[];
+};
+layout (std430, binding = 2) buffer cellPositionAccumulate
+{
+    ivec2 accu[];
+};
+
+uniform int powerDiagramMapWidth;
+uniform int powerDiagramMapHeight;
+
+void main()
+{
+    ivec2 xy = ivec2(gl_GlobalInvocationID.xy);
+    if (xy.x < powerDiagramMapWidth && xy.y < powerDiagramMapHeight)
+	{
+        vec4 pixel = imageLoad(powerDiagramMap, xy);
+        int index = int(pixel.a);
+        atomicAdd(pixelCount[index], 1);
+        atomicAdd(accu[index].x, xy.x);
+        atomicAdd(accu[index].y, xy.y);
     }
 }
 )";
@@ -563,6 +616,24 @@ bool OMT2D::InitializeGPUBuffer()
 
     /*******************************************************************************************************/
 
+    std::vector<int> zeroBufferInt2(m_pMesh->n_vertices() * 2, 0);
+
+    if (m_CellPositionAccumulateBuffer != GLuint(-1)) { glDeleteBuffers(1, &m_CellPositionAccumulateBuffer); }
+    glGenBuffers(1, &m_CellPositionAccumulateBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_CellPositionAccumulateBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, zeroBufferInt2.size() * sizeof(int), zeroBufferInt2.data(), GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+    m_ComputeCellSiteResetShader = std::make_unique<Shader>("Compute Cell Site Reset Shader");
+    m_ComputeCellSiteResetShader->CompileShaderFromString(pComputeCellSiteResetShaderCS, ESHADER_TYPE_COMPUTE);
+    m_ComputeCellSiteResetShader->LinkProgram();
+
+    m_ComputeCellSiteShader = std::make_unique<Shader>("Compute Cell Site Shader");
+    m_ComputeCellSiteShader->CompileShaderFromString(pComputeCellSiteShaderCS, ESHADER_TYPE_COMPUTE);
+    m_ComputeCellSiteShader->LinkProgram();
+
+    /*******************************************************************************************************/
+
     return true;
 }
 
@@ -593,9 +664,10 @@ void OMT2D::Run()
         DrawPowerDiagramScreen();
         ComputeCellStats();
         UpdatePlane(iterations++);
-
         GLFWLoopEnd();
     }
+
+    ComputeCellSite();
 
     glfwTerminate();
     g_pGlobalPointer = nullptr;
@@ -617,12 +689,11 @@ void OMT2D::SetPlaneParamToGPUBuffer(const double * X)
 void OMT2D::ComputeGradientAndFunctionValFromGPUBuffer(double * G, double * F)
 {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_GradientBuffer);
-    void * pGradient = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+    auto * pGradient = reinterpret_cast<float *>(glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY));
     *F = 0.0;
     for (size_t i = 0; i < m_pMesh->n_vertices(); i++)
     {
-        float gradient = reinterpret_cast<float *>(pGradient)[i];
-        G[i] = static_cast<double>(gradient);
+        G[i] = static_cast<double>(pGradient[i]);
         *F += (G[i] * G[i]);
     }
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
@@ -867,13 +938,13 @@ void OMT2D::ComputePlaneZRange()
     glMemoryBarrier(GL_TRANSFORM_FEEDBACK_BARRIER_BIT);
 
     glBindBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, m_PlaneZRangeBuffer);
-    void * pRange = glMapBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, GL_READ_ONLY);
+    auto * pRange = reinterpret_cast<float *>(glMapBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, GL_READ_ONLY));
     float zMin =  std::numeric_limits<float>::max();
     float zMax = -std::numeric_limits<float>::max();
     for (size_t i = 0; i < m_pMesh->n_vertices() * 2; i += 2)
     {
-        zMin = std::min(zMin, reinterpret_cast<float *>(pRange)[i + 0]);
-        zMax = std::max(zMax, reinterpret_cast<float *>(pRange)[i + 1]);
+        zMin = std::min(zMin, pRange[i + 0]);
+        zMax = std::max(zMax, pRange[i + 1]);
     }
     glUnmapBuffer(GL_TRANSFORM_FEEDBACK_BUFFER);
     glBindBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, 0);
@@ -962,12 +1033,11 @@ void OMT2D::UpdatePlane(int iterations)
 float OMT2D::ComputeError()
 {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_GradientBuffer);
-    void * pGradient = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+    auto * pGradient = reinterpret_cast<float *>(glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY));
     float error = 0.0f;
     for (size_t i = 0; i < m_pMesh->n_vertices(); i++)
     {
-        float gradient = reinterpret_cast<float *>(pGradient)[i];
-        error += (gradient * gradient);
+        error += (pGradient[i] * pGradient[i]);
     }
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
@@ -977,16 +1047,71 @@ float OMT2D::ComputeError()
 uint32_t OMT2D::ComputeMissingPointNum()
 {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_CurrentAreaBuffer);
-    void * pCurrArea = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+    auto * pCurrArea = reinterpret_cast<float *>(glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY));
     uint32_t num = 0;
     for (size_t i = 0; i < m_pMesh->n_vertices(); i++)
     {
-        float currArea = reinterpret_cast<float *>(pCurrArea)[i];
-        if (currArea == 0.0f) { num++; }
+        if (pCurrArea[i] == 0.0f) { num++; }
     }
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     return num;
+}
+
+void OMT2D::ComputeCellSite()
+{
+    m_CellPixelCountResetShader->UseProgram();
+    m_CellPixelCountResetShader->SetInt("cellNum", static_cast<int>(m_pMesh->n_vertices()));
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_CellPixelCountBuffer);
+    glDispatchCompute(static_cast<GLuint>(m_pMesh->n_vertices() / 32 + 1), 1u, 1u);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+    m_ComputeCellSiteResetShader->UseProgram();
+    m_ComputeCellSiteResetShader->SetInt("cellNum", static_cast<int>(m_pMesh->n_vertices()));
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_CellPositionAccumulateBuffer);
+    glDispatchCompute(static_cast<GLuint>(m_pMesh->n_vertices() / 32 + 1), 1u, 1u);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+    m_ComputeCellSiteShader->UseProgram();
+    m_ComputeCellSiteShader->SetInt("powerDiagramMapWidth", m_RenderTargetWidth);
+    m_ComputeCellSiteShader->SetInt("powerDiagramMapHeight", m_RenderTargetHeight);
+    m_ComputeCellSiteShader->SetInt("powerDiagramMap", 0);
+    glBindImageTexture(0, m_PowerDiagramTexture, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, m_CellPixelCountBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, m_CellPositionAccumulateBuffer);
+    glDispatchCompute(static_cast<GLuint>(m_RenderTargetWidth / 32 + 1), static_cast<GLuint>(m_RenderTargetHeight / 32 + 1), 1u);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+    std::vector<int> cellCount(m_pMesh->n_vertices(), 0);
+    std::vector<int> xAccu(m_pMesh->n_vertices(), 0);
+    std::vector<int> yAccu(m_pMesh->n_vertices(), 0);
+
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_CellPixelCountBuffer);
+    auto * pCellPixelCount = reinterpret_cast<int *>(glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY));
+    for (size_t i = 0; i < m_pMesh->n_vertices(); i++)
+    {
+        cellCount[i] = pCellPixelCount[i];
+    }
+    glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_CellPositionAccumulateBuffer);
+    auto * pCellPositionAccu = reinterpret_cast<int *>(glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY));
+    for (size_t i = 0; i < m_pMesh->n_vertices(); i++)
+    {
+        xAccu[i] = pCellPositionAccu[2 * i + 0];
+        yAccu[i] = pCellPositionAccu[2 * i + 1];
+    }
+    glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+    for (size_t i = 0; i < m_pMesh->n_vertices(); i++)
+    {
+        const auto vh = TriMesh::VertexHandle(static_cast<int>(i));
+        float u = static_cast<float>(xAccu[i]) / static_cast<float>(cellCount[i]) / static_cast<float>(m_RenderTargetWidth);
+        float v = static_cast<float>(yAccu[i]) / static_cast<float>(cellCount[i]) / static_cast<float>(m_RenderTargetHeight);
+        m_pMesh->set_texcoord2D(vh, { u, v });
+    }
 }
 
 

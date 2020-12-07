@@ -67,6 +67,7 @@ public:
     void UpdatePlane(int iterations);
     float ComputeError();
     uint32_t ComputeMissingPointNum();
+    void ComputeCellSite();
 
 private:
     TriMesh * m_pMesh = nullptr;
@@ -108,6 +109,10 @@ private:
     GLuint m_AdamMomentum1Buffer = GLuint(-1);
     GLuint m_AdamMomentum2Buffer = GLuint(-1);
     std::unique_ptr<Shader> m_UpdatePlaneShader;
+
+    GLuint m_CellPositionAccumulateBuffer = GLuint(-1);
+    std::unique_ptr<Shader> m_ComputeCellSiteResetShader;
+    std::unique_ptr<Shader> m_ComputeCellSiteShader;
 
     const int m_ClientWidth = 800;
     const int m_ClientHeight = 800;
