@@ -658,7 +658,6 @@ void OMT2D::Run()
     while (!glfwWindowShouldClose(m_pWindow))
     {
         GLFWLoopBegin();
-
         ComputePlaneZRange();
         DrawPowerDiagramBack();
         DrawPowerDiagramScreen();
@@ -1105,13 +1104,20 @@ void OMT2D::ComputeCellSite()
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
+    std::set<size_t> illedVertex;
     for (size_t i = 0; i < m_pMesh->n_vertices(); i++)
     {
         const auto vh = TriMesh::VertexHandle(static_cast<int>(i));
         float u = static_cast<float>(xAccu[i]) / static_cast<float>(cellCount[i]) / static_cast<float>(m_RenderTargetWidth);
         float v = static_cast<float>(yAccu[i]) / static_cast<float>(cellCount[i]) / static_cast<float>(m_RenderTargetHeight);
+        if (cellCount[i] == 0)
+        {
+            illedVertex.insert(i);
+        }
         m_pMesh->set_texcoord2D(vh, { u, v });
     }
+
+    //TODO: FIX ILLED VERTEX
 }
 
 
