@@ -583,6 +583,7 @@ void OMT2D::SetPlaneParamToGPUBuffer(const double * X)
     for (size_t i = 0; i < m_pMesh->n_vertices(); i++)
     {
         pPlane[i].c = static_cast<float>(X[i]);
+        m_Planes[i].c = static_cast<float>(X[i]);
     }
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
