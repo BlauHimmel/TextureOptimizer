@@ -244,7 +244,6 @@ uniform int cellNum;
 uniform float t;
 uniform float beta1;
 uniform float beta2;
-uniform float epsilon;
 uniform float alpha;
 
 void main()
@@ -256,11 +255,22 @@ void main()
         momentum2[x] = beta2 * momentum2[x] + (1.0 - beta2) * grad[x] * grad[x];
 
         float momentum1Hat = momentum1[x] / (1.0 - pow(beta1, t));
-        float momentum2Hat = momentum2[x] / (1.0 - pow(beta2, t));
 
-        float u = momentum1Hat / (sqrt(momentum2Hat) + epsilon);
-
-        p[x].z -= (u * alpha);
+        float rhoLimit = 2.0 / (1.0 - beta2) - 1.0;
+        float beta2t = pow(beta2, t);
+        float rho = rhoLimit - 2.0 * t * beta2t / (1.0 - beta2t);
+        if (rho > 4.0)
+        {
+            float momentum2Hat = sqrt(momentum2[x]) / (1.0 - beta2t);
+            float rectification = sqrt(((rho - 4.0) * (rho - 2.0) * rhoLimit) / ((rhoLimit - 4.0) * (rhoLimit - 2.0) * rho));
+            float u = rectification * momentum1Hat / momentum2Hat;
+            p[x].z -= (u * alpha);
+        }
+        else
+        {
+            float u = momentum1Hat;
+            p[x].z -= (u * alpha);
+        }
     }
 }
 )";
@@ -940,7 +950,6 @@ void OMT2D::UpdatePlane(int iterations)
     m_UpdatePlaneShader->SetFloat("t", static_cast<float>(iterations));
     m_UpdatePlaneShader->SetFloat("beta1", m_Beta1);
     m_UpdatePlaneShader->SetFloat("beta2", m_Beta2);
-    m_UpdatePlaneShader->SetFloat("epsilon", m_Epsilon);
     m_UpdatePlaneShader->SetFloat("alpha", m_Alpha);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_PlaneBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, m_GradientBuffer);

@@ -104,7 +104,6 @@ private:
 
     const float m_Beta1 = 0.9f;
     const float m_Beta2 = 0.999f;
-    const float m_Epsilon = 1e-8f;
     const float m_Alpha = 5e-5f;
     GLuint m_AdamMomentum1Buffer = GLuint(-1);
     GLuint m_AdamMomentum2Buffer = GLuint(-1);
