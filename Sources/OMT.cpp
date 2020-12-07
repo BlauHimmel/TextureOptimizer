@@ -281,12 +281,6 @@ void NEWITERATION(int ITER, int CALL_ITER, double * X, double * F, double * G, d
 
 bool OMT2D::Initialize()
 {
-    if (g_pGlobalPointer != nullptr)
-    {
-        Logger::Error("Multiple OMT2D class running at the same time!");
-        return false;
-    }
-
     if (!InitializeOpenGL())
     {
         Logger::Error("Failed to initialize OpenGL.");
@@ -335,8 +329,6 @@ bool OMT2D::Initialize()
     {
         Variable[i] = m_Planes[i].c;
     }
-
-    g_pGlobalPointer = this;
 
     return true;
 }
@@ -541,6 +533,14 @@ bool OMT2D::InitializeGPUBuffer()
 
 void OMT2D::Run()
 {
+    if (g_pGlobalPointer != nullptr)
+    {
+        Logger::Error("Multiple OMT2D class running at the same time!");
+        return;
+    }
+
+    g_pGlobalPointer = this;
+
     HLBFGS(int(m_pMesh->n_vertices()), M, Variable.data(), EVALFUNC, nullptr, HLBFGS_UPDATE_Hessian, NEWITERATION, PARAMETER, INFO);
 
     Timer fpsTimer, totalTimer;
