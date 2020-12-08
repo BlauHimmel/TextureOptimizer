@@ -37,7 +37,7 @@ public:
     /* Used for HLBFGS */
     int INFO[20] = { 0 };
     /* Used for HLBFGS */
-    int M = 5;
+    int M = 20;
     /* Used for HLBFGS */
     std::vector<double> Variable;
 

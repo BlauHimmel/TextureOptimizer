@@ -350,12 +350,12 @@ void NEWITERATION(int ITER, int CALL_ITER, double * X, double * F, double * G, d
     g_pGlobalPointer->DrawPowerDiagramScreen();
     g_pGlobalPointer->GLFWLoopEnd();
 
-    Logger::Info("HLBFGS: Iterations: %d, Error = %lf, Missing Point = %u", ITER, g_pGlobalPointer->ComputeError(), g_pGlobalPointer->ComputeMissingPointNum());
+    Logger::Info("HLBFGS: Iterations: %d, Error = %.8f, Missing Point = %u", ITER - 1, g_pGlobalPointer->ComputeError(), g_pGlobalPointer->ComputeMissingPointNum());
 
     if (g_pGlobalPointer->GLFWShouldClose())
     {
         /* Stop the iteration manually. */
-        g_pGlobalPointer->INFO[4] = g_pGlobalPointer->INFO[2];
+        g_pGlobalPointer->INFO[4] = g_pGlobalPointer->INFO[2] - 1;
         return;
     }
 }
@@ -396,7 +396,7 @@ bool OMT2D::Initialize()
     /* The LBFGS strategy. 0: standard, 1 : M1QN3 strategy[8](recommended). */
     INFO[3] = 1;
     /* The max number of iterations */
-    INFO[4] = 100000;
+    INFO[4] = 400;
     /* 1: print message, 0: do nothing */
     INFO[5] = 0;
     /* The update interval of Hessian. (typical choices : 0 - 200) */
@@ -548,13 +548,12 @@ bool OMT2D::InitializeGPUBuffer()
     glBindFramebuffer(GL_FRAMEBUFFER, m_PowerDiagramFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_PowerDiagramTexture, 0);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_PowerDiagramDepthRBO);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
     if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
     {
         Logger::Error("ERROR::FRAMEBUFFER:: Framebuffer is not complete!");
         return false;
     }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     if (m_PowerDiagramVAO != GLuint(-1)) { glDeleteVertexArrays(1, &m_PowerDiagramVAO); }
     glGenVertexArrays(1, &m_PowerDiagramVAO);
@@ -689,12 +688,43 @@ void OMT2D::ComputeGradientAndFunctionValFromGPUBuffer(double * G, double * F)
 {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_GradientBuffer);
     auto * pGradient = reinterpret_cast<float *>(glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY));
-    *F = 0.0;
     for (size_t i = 0; i < m_pMesh->n_vertices(); i++)
     {
         G[i] = static_cast<double>(pGradient[i]);
         *F += (G[i] * G[i]);
     }
+    glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+    static std::unique_ptr<float[]> buffer(new float[m_RenderTargetWidth * m_RenderTargetHeight * 4]);
+    memset(buffer.get(), 0, 4 * m_RenderTargetWidth * m_RenderTargetHeight * sizeof(float));
+
+    glBindTexture(GL_TEXTURE_2D, m_PowerDiagramTexture);
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, buffer.get());
+
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_PlaneBuffer);
+    auto * pPlane = reinterpret_cast<Plane *>(glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY));
+
+    float pixelArea = (2.0f / static_cast<float>(m_RenderTargetWidth)) * (2.0f / static_cast<float>(m_RenderTargetHeight));
+    *F = 0.0;
+    for (int y = 0; y < m_RenderTargetHeight; y++)
+    {
+        for (int x = 0; x < m_RenderTargetWidth; x++)
+        {
+            auto index = static_cast<int>(buffer[(y * m_RenderTargetWidth + x) * 4 + 3]);
+            float xx = (static_cast<float>(x) / static_cast<float>(m_RenderTargetWidth) * 2.0f - 1.0f);
+            float yy = (static_cast<float>(y) / static_cast<float>(m_RenderTargetHeight) * 2.0f - 1.0f);
+            float zz = xx * pPlane[index].a + yy * pPlane[index].b + pPlane[index].c;
+            float vol = pixelArea * zz;
+            *F += vol;
+        }
+    }
+
+    for (size_t i = 0; i < m_pMesh->n_vertices(); i++)
+    {
+        *F -= (m_TargetAreas[i] * pPlane[i].c);
+    }
+
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
@@ -708,7 +738,7 @@ void OMT2D::GLFWLoopBegin()
         m_FrameCount = 0.0;
         m_FPSTimer.Reset();
 
-        std::string title = Logger::Format("OMT %u Iterations / Sec, Error = %.8lf , Missing point: %u Elapse: %s.",
+        std::string title = Logger::Format("OMT %u Iterations / Sec, Error = %.8f , Missing point: %u, Elapse: %s.",
             m_FPS, ComputeError(), ComputeMissingPointNum(), m_TotalTimer.ElapsedString(true).c_str());
         glfwSetWindowTitle(m_pWindow, title.c_str());
     }
@@ -1104,7 +1134,7 @@ void OMT2D::ComputeCellSite()
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
-    std::set<size_t> illedVertex;
+    std::set<int> illedVertices;
     for (size_t i = 0; i < m_pMesh->n_vertices(); i++)
     {
         const auto vh = TriMesh::VertexHandle(static_cast<int>(i));
@@ -1112,12 +1142,80 @@ void OMT2D::ComputeCellSite()
         float v = static_cast<float>(yAccu[i]) / static_cast<float>(cellCount[i]) / static_cast<float>(m_RenderTargetHeight);
         if (cellCount[i] == 0)
         {
-            illedVertex.insert(i);
+            u = -1.0f, v = -1.0f;
+            illedVertices.insert(static_cast<int>(i));
         }
         m_pMesh->set_texcoord2D(vh, { u, v });
     }
 
-    //TODO: FIX ILLED VERTEX
+    std::map<int, std::set<int>, std::greater<>> valenceVericesMap;
+    std::map<int, int> vertexValenceMap;
+    for (int illedVertex : illedVertices)
+    {
+        int valence = 0;
+        const auto vh = TriMesh::VertexHandle(illedVertex);
+        for (const auto vhvh : m_pMesh->vv_range(vh))
+        {
+            if (illedVertices.count(vhvh.idx()) == 0)
+            {
+                valence++;
+            }
+        }
+        valenceVericesMap[valence].insert(vh.idx());
+        vertexValenceMap[vh.idx()] = valence;
+    }
+
+    while (!illedVertices.empty())
+    {
+        auto & kv = *valenceVericesMap.begin();
+
+        int valence = kv.first;
+        int index = *kv.second.begin();
+
+        TriMesh::TexCoord2D uv(0.0, 0.0);
+        const auto vh = TriMesh::VertexHandle(index);
+        for (const auto vhvh : m_pMesh->vv_range(vh))
+        {
+            if (illedVertices.count(vhvh.idx()) == 0)
+            {
+                const auto uvuv = m_pMesh->texcoord2D(vhvh);
+                uv[0] += uvuv[0];
+                uv[1] += uvuv[1];
+            }
+        }
+        uv[0] /= static_cast<float>(valence);
+        uv[1] /= static_cast<float>(valence);
+        m_pMesh->set_texcoord2D(vh, uv);
+
+        if (uv[0] < 0.0f || uv[0] > 1.0f || uv[1] < 0.0f || uv[1] > 1.0f)
+        {
+            Logger::Test("Exceed [0,1]^2, uv(%lf, %lf), valence = %d", uv[0], uv[1], valence);
+        }
+
+        illedVertices.erase(index);
+        vertexValenceMap.erase(index);
+        kv.second.erase(index);
+        if (kv.second.empty())
+        {
+            valenceVericesMap.erase(kv.first);
+        }
+
+        for (const auto vhvh : m_pMesh->vv_range(vh))
+        {
+            if (illedVertices.count(vhvh.idx()) != 0)
+            {
+                int & vhvhValence = vertexValenceMap[vhvh.idx()];
+                std::set<int> & vhvhValenceVertexSet = valenceVericesMap[vhvhValence];
+                vhvhValenceVertexSet.erase(vhvh.idx());
+                if (vhvhValenceVertexSet.empty())
+                {
+                    valenceVericesMap.erase(vhvhValence);
+                }
+                vhvhValence++;
+                valenceVericesMap[vhvhValence].insert(vhvh.idx());
+            }
+        }
+    }
 }
 
 
