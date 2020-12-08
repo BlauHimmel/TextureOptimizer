@@ -1216,6 +1216,40 @@ void OMT2D::ComputeCellSite()
             }
         }
     }
+
+    for (const auto vh : m_pMesh->vertices())
+    {
+        if (!m_pMesh->is_boundary(vh)) { continue; }
+        const TriMesh::TexCoord2D uv = m_pMesh->texcoord2D(vh);
+        const TriMesh::TexCoord2D center(0.5, 0.5);
+        const TriMesh::TexCoord2D vec = (uv - center).normalized();
+
+        const std::vector<double> origin = { center[0], center[1] };
+        const std::vector<double> dir = { vec[0], vec[1] };
+        const std::vector<double> invdir = { 1.0 / dir[0], 1.0 / dir[1] };
+
+        double tx, ty;
+
+        if (invdir[0] > 0)
+        {
+            tx = (1.0 - origin[0]) * invdir[0];
+        }
+        else
+        {
+            tx = -origin[0] * invdir[0];
+        }
+
+        if (invdir[1] > 0)
+        {
+            ty = (1.0 - origin[1]) * invdir[1];
+        }
+        else
+        {
+            ty = -origin[1] * invdir[1];
+        }
+
+        m_pMesh->set_texcoord2D(vh, center + vec * std::min(tx, ty));
+    }
 }
 
 
