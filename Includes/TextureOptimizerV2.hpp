@@ -22,12 +22,12 @@ class TextureOptimizerV2
 {
 public:
     TextureOptimizerV2(TriMesh * pMesh, Texture * pTexture) : m_pMesh(pMesh), m_pTexture(pTexture) { }
-    bool Run(uint32_t width, uint32_t height, EParameterization parameterization, const std::string & meshOutput, const std::string & textureOutput);
+    bool Run(uint32_t width, uint32_t height, EParameterization parameterization, double clusterThreshold, const std::string & meshOutput, const std::string & textureOutput);
 
 private:
     [[maybe_unused]] static std::unique_ptr<AtlasInfo> MarkAtlasIndex(TriMesh * pMesh);
     [[maybe_unused]] static size_t MergeAtlas(TriMesh * pMesh, AtlasInfo * pAtlasInfo);
-    static std::unique_ptr<AtlasInfo> MeshClustering(TriMesh * pMesh);
+    static std::unique_ptr<AtlasInfo> MeshClustering(TriMesh * pMesh, double clusterThreshold);
     static std::unique_ptr<TriMesh[]> CreateSubMeshFromAtlas(const TriMesh * pMesh, AtlasInfo * pAtlasInfo);
     [[maybe_unused]] static bool MergeResultAndWrite(const TriMesh * pMeshes, const Texture * pTextures, const Real * pSizeCoeffs,
         const Real * uvWidths, const Real * uvHeights, size_t clusterNum, uint32_t mergedTextureWidth, uint32_t mergedTextureHeight,

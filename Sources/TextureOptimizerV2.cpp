@@ -15,7 +15,7 @@
 
 const char * MESH_FPROP_ATLAS_INDEX = "atlasIdx";
 
-bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization parameterization, const std::string & meshOutput, const std::string & textureOutput)
+bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization parameterization, double clusterThreshold, const std::string & meshOutput, const std::string & textureOutput)
 {
     if (m_pMesh == nullptr || m_pTexture == nullptr || !m_pTexture->IsValid())
     {
@@ -31,7 +31,7 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
     Logger::Info("<RepairNonManifold> Completed!");
 
     Logger::Info("Clustering the mesh...");
-    std::unique_ptr<AtlasInfo> atlasInfo = MeshClustering(m_pMesh);
+    std::unique_ptr<AtlasInfo> atlasInfo = MeshClustering(m_pMesh, clusterThreshold);
     if (atlasInfo == nullptr)
     {
         Logger::Error("Error occurred when clustering the mesh.");
@@ -651,14 +651,14 @@ struct TexCoord2DHasher
     return pAtlasInfo->atlasNum;
 }
 
-std::unique_ptr<AtlasInfo> TextureOptimizerV2::MeshClustering(TriMesh * pMesh)
+std::unique_ptr<AtlasInfo> TextureOptimizerV2::MeshClustering(TriMesh * pMesh, double clusterThreshold)
 {
     if (pMesh == nullptr)
     {
         return nullptr;
     }
 
-    std::vector<std::vector<int>> clusters = ClusteringAlgorithm::Cluster(pMesh, 4 * 4, 0.75);
+    std::vector<std::vector<int>> clusters = ClusteringAlgorithm::Cluster(pMesh, 4 * 4, clusterThreshold);
 
     OpenMesh::FPropHandleT<size_t> atlasIdxFProp;
     pMesh->add_property(atlasIdxFProp, MESH_FPROP_ATLAS_INDEX);
