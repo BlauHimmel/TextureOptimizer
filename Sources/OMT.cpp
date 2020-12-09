@@ -438,7 +438,6 @@ bool OMT2D::InitializeOpenGL()
     glfwSwapInterval(0);
 
     glfwSetWindowAttrib(m_pWindow, GLFW_RESIZABLE, GLFW_FALSE);
-    glfwSetWindowAttrib(m_pWindow, GLFW_MAXIMIZED , GLFW_FALSE);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
@@ -459,7 +458,10 @@ bool OMT2D::InitializeGPUBuffer()
 
     if (m_TargetAreaBuffer != GLuint(-1)) { glDeleteBuffers(1, &m_TargetAreaBuffer); }
     glGenBuffers(1, &m_TargetAreaBuffer);
-    InitTargetArea(m_pMesh, m_TargetAreas);
+    if (!m_bTargetAreaAssignedWhenConstruct)
+    {
+        InitTargetArea(m_pMesh, m_TargetAreas);
+    }
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_TargetAreaBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, m_TargetAreas.size() * sizeof(float), m_TargetAreas.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
@@ -1148,6 +1150,7 @@ void OMT2D::ComputeCellSite()
         m_pMesh->set_texcoord2D(vh, { u, v });
     }
 
+    /* repair illed vertices which correspond to the missing point in power diagram */
     std::map<int, std::set<int>, std::greater<>> valenceVericesMap;
     std::map<int, int> vertexValenceMap;
     for (int illedVertex : illedVertices)
@@ -1187,11 +1190,6 @@ void OMT2D::ComputeCellSite()
         uv[1] /= static_cast<float>(valence);
         m_pMesh->set_texcoord2D(vh, uv);
 
-        if (uv[0] < 0.0f || uv[0] > 1.0f || uv[1] < 0.0f || uv[1] > 1.0f)
-        {
-            Logger::Test("Exceed [0,1]^2, uv(%lf, %lf), valence = %d", uv[0], uv[1], valence);
-        }
-
         illedVertices.erase(index);
         vertexValenceMap.erase(index);
         kv.second.erase(index);
@@ -1217,6 +1215,7 @@ void OMT2D::ComputeCellSite()
         }
     }
 
+    /* optimize boundary vertex */
     for (const auto vh : m_pMesh->vertices())
     {
         if (!m_pMesh->is_boundary(vh)) { continue; }

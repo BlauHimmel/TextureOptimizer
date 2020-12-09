@@ -21,7 +21,7 @@ struct DualNodeType
 class ClusteringAlgorithm
 {
 public:
-    static std::vector<std::vector<int>> Cluster(TriMesh * pMesh, size_t clusterNum = 9);
+    static std::vector<std::vector<int>> Cluster(TriMesh * pMesh, size_t clusterNum = 9, double threshold = 0.02);
 
 private:
     static void GetDualEdges(const Eigen::MatrixXd & V, const Eigen::MatrixXi & F, std::vector<std::pair<int, int>> & dualEdges);

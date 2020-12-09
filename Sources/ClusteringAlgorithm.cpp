@@ -26,7 +26,7 @@ DualNodeType DualNodeType::operator+(const DualNodeType & rhs) const
     return res;
 }
 
-std::vector<std::vector<int>> ClusteringAlgorithm::Cluster(TriMesh * pMesh, size_t clusterNum)
+std::vector<std::vector<int>> ClusteringAlgorithm::Cluster(TriMesh * pMesh, size_t clusterNum, double threshold)
 {
     Eigen::MatrixXd V;
     Eigen::MatrixXi F;
@@ -93,8 +93,8 @@ std::vector<std::vector<int>> ClusteringAlgorithm::Cluster(TriMesh * pMesh, size
 
     while (!pq.empty())
     {
-        // double cost = -pq.top().first;
-        // if (cost > threshold) { break; }
+        double cost = -pq.top().first;
+        if (cost > threshold) { break; }
         if (valid.size() <= clusterNum) { break; }
         auto p = dualEdges[pq.top().second];
         pq.pop();

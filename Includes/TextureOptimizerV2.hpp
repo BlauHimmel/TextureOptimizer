@@ -37,7 +37,7 @@ private:
         size_t clusterNum, uint32_t mergedTextureWidth, uint32_t mergedTextureHeight,
         uint32_t mergedTextureChannels, const std::string & meshOutput, const std::string & textureOutput,
         TriMesh * pMergedMesh, Texture * pMergedTexture);
-    static bool FurtherOptimize(const TriMesh * pMergedMesh, const Texture * pMergedTexture, const std::string & meshOutput, const std::string & textureOutput);
+    static bool FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, const Texture * pMergedTexture, const std::string & meshOutput, const std::string & textureOutput);
 
 private:
     [[maybe_unused]] static void MergeAtlasInfoAndFProperty(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, size_t source, size_t target);

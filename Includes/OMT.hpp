@@ -13,6 +13,7 @@ class OMT2D
 {
 public:
     explicit OMT2D(TriMesh * pMesh) : m_pMesh(pMesh) { }
+    OMT2D(TriMesh * pMesh, std::vector<float> targetAreas) : m_pMesh(pMesh), m_TargetAreas(std::move(targetAreas)), m_bTargetAreaAssignedWhenConstruct(true) { }
 
     bool Initialize();
     bool InitializeOpenGL();
@@ -72,6 +73,7 @@ public:
 private:
     TriMesh * m_pMesh = nullptr;
     GLFWwindow * m_pWindow = nullptr;
+    bool m_bTargetAreaAssignedWhenConstruct = false;
 
     uint32_t m_FPS = 0u;
     Timer m_FPSTimer, m_TotalTimer;

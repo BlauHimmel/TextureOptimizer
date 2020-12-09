@@ -11,6 +11,7 @@
 #include "Logger.hpp"
 #include "ClusteringAlgorithm.hpp"
 #include "BarycentricParameterization.hpp"
+#include "OMT.hpp"
 
 const char * MESH_FPROP_ATLAS_INDEX = "atlasIdx";
 
@@ -217,7 +218,7 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
     if (parameterization != EParameterization::ESMI04 && parameterization != EParameterization::EBarycentric)
     {
         Logger::Info("Further optimizing the merged mesh and the merged textures...");
-        if (!FurtherOptimize(&mergedMesh, &mergedTexture, optMergedMeshOutput, optMergedTextureOutput))
+        if (!FurtherOptimizeAndWrite(&mergedMesh, &mergedTexture, optMergedMeshOutput, optMergedTextureOutput))
         {
             Logger::Error("Error occurred when further optimizing the merged mesh and the merged textures.");
             return false;
@@ -657,7 +658,7 @@ std::unique_ptr<AtlasInfo> TextureOptimizerV2::MeshClustering(TriMesh * pMesh)
         return nullptr;
     }
 
-    std::vector<std::vector<int>> clusters = ClusteringAlgorithm::Cluster(pMesh, 4 * 4);
+    std::vector<std::vector<int>> clusters = ClusteringAlgorithm::Cluster(pMesh, 4 * 4, 0.75);
 
     OpenMesh::FPropHandleT<size_t> atlasIdxFProp;
     pMesh->add_property(atlasIdxFProp, MESH_FPROP_ATLAS_INDEX);
@@ -687,6 +688,8 @@ std::unique_ptr<AtlasInfo> TextureOptimizerV2::MeshClustering(TriMesh * pMesh)
             }
         }
     }
+
+    Logger::Info("Cluster count = %zd", atlasInfo->atlasNum);
 
     /* visualization used for debug */
     DisplayAtlas(pMesh, atlasInfo->atlasNum, MESH_FPROP_ATLAS_INDEX, "Atlas - After Clustering");
@@ -1051,12 +1054,14 @@ struct PointHasher
     }
 };
 
-bool TextureOptimizerV2::FurtherOptimize(const TriMesh * pMergedMesh, const Texture * pMergedTexture, const std::string & meshOutput, const std::string & textureOutput)
+bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, const Texture * pMergedTexture, const std::string & meshOutput, const std::string & textureOutput)
 {
     if (pMergedMesh == nullptr || pMergedTexture == nullptr)
     {
         return false;
     }
+
+    /* Construct scaffold for the optimized uv parameterization mesh */
 
     TriMesh uvMesh;
     std::vector<OpenMesh::VertexHandle> vhs;
@@ -1328,10 +1333,127 @@ bool TextureOptimizerV2::FurtherOptimize(const TriMesh * pMergedMesh, const Text
         DisplayVF(V2, F2, "Scaffold");
     }
 
-    /* TODO: Use OMT to optimize the scaffold uv mesh. */
-    /* TODO: Remember that scaffold mesh is scaled a little bit bigger than origin. */
+    /* Use OMT to optimize the scaffold uv mesh. */
 
-    return true;
+    std::vector<float> targetAreas;
+    targetAreas.resize(scaffoldUVMesh.n_vertices(), 0.0f);
+    const double scaffoldAreaShrinkFactor = 0.015;
+
+    Real totalMeshArea = 0.0f;
+    for (const auto & fh : scaffoldUVMesh.faces())
+    {
+        TriMesh::Point points[3];
+        size_t Index = 0;
+
+        for (const auto & vh : scaffoldUVMesh.fv_range(fh))
+        {
+            points[Index++] = scaffoldUVMesh.point(vh);
+        }
+
+        const auto & va = points[0];
+        const auto & vb = points[1];
+        const auto & vc = points[2];
+
+        auto lab = va - vb;
+        auto lac = vc - vb;
+
+        Real area = lab.cross(lac).norm() * 0.5;
+
+        if (fh.idx() < uvMesh.n_faces())
+        {
+            totalMeshArea += area;
+        }
+        else
+        {
+            totalMeshArea += area * scaffoldAreaShrinkFactor;
+        }
+    }
+
+    for (const auto & vh : scaffoldUVMesh.vertices())
+    {
+        Real oneRingMeshArea = 0.0;
+        for (const auto & fh : scaffoldUVMesh.vf_range(vh))
+        {
+            TriMesh::Point points[3];
+            size_t Index = 0;
+
+            for (const auto & fhvh : scaffoldUVMesh.fv_range(fh))
+            {
+                points[Index++] = scaffoldUVMesh.point(fhvh);
+            }
+
+            const auto & va = points[0];
+            const auto & vb = points[1];
+            const auto & vc = points[2];
+
+            auto lab = va - vb;
+            auto lac = vc - vb;
+
+            Real area = lab.cross(lac).norm() * 0.5;
+
+            if (fh.idx() < uvMesh.n_faces())
+            {
+                oneRingMeshArea += area / 3.0;
+            }
+            else
+            {
+                oneRingMeshArea += area / 3.0 * scaffoldAreaShrinkFactor;
+            }
+        }
+
+        const Real totalTargetArea = 4.0;
+        targetAreas[vh.idx()] = static_cast<float>(oneRingMeshArea / totalMeshArea * totalTargetArea);
+    }
+
+    OMT2D omt(&scaffoldUVMesh, targetAreas);
+    if (!omt.Initialize())
+    {
+        Logger::Error("Failed to initialize OMT2D.");
+        return false;
+    }
+    omt.Run();
+
+    scaffoldUVMesh.request_face_status();
+    scaffoldUVMesh.request_edge_status();
+    scaffoldUVMesh.request_vertex_status();
+
+    for (const auto fh : scaffoldUVMesh.faces())
+    {
+        if (fh.idx() >= uvMesh.n_faces())
+        {
+            scaffoldUVMesh.delete_face(fh);
+        }
+    }
+
+    scaffoldUVMesh.garbage_collection();
+    scaffoldUVMesh.release_face_status();
+    scaffoldUVMesh.release_edge_status();
+    scaffoldUVMesh.release_vertex_status();
+
+    TriMesh furtherOptMesh(*pMergedMesh);
+    for (const auto fh : furtherOptMesh.faces())
+    {
+        for (const auto heh : furtherOptMesh.fh_range(fh))
+        {
+            const auto vh = furtherOptMesh.to_vertex_handle(heh);
+            const auto & uv = scaffoldUVMesh.texcoord2D(vh);
+            furtherOptMesh.set_texcoord2D(heh, uv);
+        }
+    }
+
+    Texture furtherOptTexture;
+    pMergedTexture->CopyTo(&furtherOptTexture);
+    if (!TextureIntegrate(pMergedMesh, &furtherOptMesh, &furtherOptTexture, pMergedTexture->Width(), pMergedTexture->Height()))
+    {
+        return false;
+    }
+
+    OpenMesh::IO::Options wOpts;
+    wOpts += OpenMesh::IO::Options::FaceTexCoord;
+    bool bSuccessMesh = OpenMesh::IO::write_mesh(furtherOptMesh, meshOutput, wOpts);
+    bool bSuccessTexture = furtherOptTexture.Write(textureOutput);
+
+    return bSuccessMesh && bSuccessTexture;
 }
 
 [[maybe_unused]] void TextureOptimizerV2::MergeAtlasInfoAndFProperty(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, size_t source, size_t target)
