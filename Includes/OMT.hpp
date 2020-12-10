@@ -18,7 +18,7 @@ public:
     bool Initialize();
     bool InitializeOpenGL();
     bool InitializeGPUBuffer();
-    void Run();
+    void Run(double threshold);
 
 public:
     /* Used for HLBFGS */

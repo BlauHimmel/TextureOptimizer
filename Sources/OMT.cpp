@@ -332,9 +332,11 @@ void main()
 
 /* Used for HLBFGS */
 OMT2D * g_pGlobalPointer = nullptr;
+double g_Threshold = 0.0; /* This value is modfied each time Run() is called. When Run() is finished, this value is reset to 0.0. */
+bool g_bThresholdReached = false;
 
 /* Used for HLBFGS */
-void EVALFUNC(int N, double * X, double * PREV_X, double * F, double * G)
+void EVALFUNC([[maybe_unused]] int N, double * X, [[maybe_unused]] double * PREV_X, double * F, double * G)
 {
     g_pGlobalPointer->SetPlaneParamToGPUBuffer(X);
     g_pGlobalPointer->ComputePlaneZRange();
@@ -344,13 +346,23 @@ void EVALFUNC(int N, double * X, double * PREV_X, double * F, double * G)
 }
 
 /* Used for HLBFGS */
-void NEWITERATION(int ITER, int CALL_ITER, double * X, double * F, double * G, double * GNORM)
+void NEWITERATION(int ITER, [[maybe_unused]] int CALL_ITER, [[maybe_unused]] double * X, [[maybe_unused]] double * F, [[maybe_unused]] double * G, double * GNORM) // NOLINT(readability-non-const-parameter)
 {
     g_pGlobalPointer->GLFWLoopBegin();
     g_pGlobalPointer->DrawPowerDiagramScreen();
     g_pGlobalPointer->GLFWLoopEnd();
 
-    Logger::Info("HLBFGS: Iterations: %d, Error = %.8f, Missing Point = %u", ITER - 1, g_pGlobalPointer->ComputeError(), g_pGlobalPointer->ComputeMissingPointNum());
+    double error = g_pGlobalPointer->ComputeError();
+    uint32_t missingPointNum = g_pGlobalPointer->ComputeMissingPointNum();
+    Logger::Info("HLBFGS: Iterations: %d, Error = %.8f, Missing Point = %u.", ITER - 1, error, missingPointNum);
+
+    if (error <= g_Threshold)
+    {
+        /* Stop the iteration manually. */
+        g_bThresholdReached = true;
+        g_pGlobalPointer->INFO[4] = g_pGlobalPointer->INFO[2] - 1;
+        return;
+    }
 
     if (g_pGlobalPointer->GLFWShouldClose())
     {
@@ -638,7 +650,7 @@ bool OMT2D::InitializeGPUBuffer()
     return true;
 }
 
-void OMT2D::Run()
+void OMT2D::Run(double threshold)
 {
     if (g_pGlobalPointer != nullptr)
     {
@@ -647,6 +659,8 @@ void OMT2D::Run()
     }
 
     g_pGlobalPointer = this;
+    g_Threshold = threshold;
+    g_bThresholdReached = false;
 
     m_FPSTimer.Reset();
     m_TotalTimer.Reset();
@@ -656,7 +670,7 @@ void OMT2D::Run()
     HLBFGS(int(m_pMesh->n_vertices()), M, Variable.data(), EVALFUNC, nullptr, HLBFGS_UPDATE_Hessian, NEWITERATION, PARAMETER, INFO);
 
     int32_t iterations = 1;
-    while (!glfwWindowShouldClose(m_pWindow))
+    while (!glfwWindowShouldClose(m_pWindow) && !g_bThresholdReached)
     {
         GLFWLoopBegin();
         ComputePlaneZRange();
@@ -667,10 +681,21 @@ void OMT2D::Run()
         GLFWLoopEnd();
     }
 
-    ComputeCellSite();
+    if (g_bThresholdReached)
+    {
+        Logger::Info("Threshold reached, stop the iterations.");
+    }
+    else
+    {
+        Logger::Info("User manually stop the iterations.");
+    }
 
+    ComputeCellSite();
     glfwTerminate();
+
     g_pGlobalPointer = nullptr;
+    g_Threshold = 0.0;
+    g_bThresholdReached = false;
 }
 
 void OMT2D::SetPlaneParamToGPUBuffer(const double * X)
@@ -740,9 +765,17 @@ void OMT2D::GLFWLoopBegin()
         m_FrameCount = 0.0;
         m_FPSTimer.Reset();
 
-        std::string title = Logger::Format("OMT %u Iterations / Sec, Error = %.8f , Missing point: %u, Elapse: %s.",
-            m_FPS, ComputeError(), ComputeMissingPointNum(), m_TotalTimer.ElapsedString(true).c_str());
+        float error = ComputeError();
+        uint32_t missingPointNum = ComputeMissingPointNum();
+
+        std::string title = Logger::Format("OMT %u Iter./Sec, Err. = %.8f , Miss.: %u, Elap.: %s. (Close the window to stop the iteration)",
+            m_FPS, error, missingPointNum, m_TotalTimer.ElapsedString(true).c_str());
         glfwSetWindowTitle(m_pWindow, title.c_str());
+
+        if (error <= g_Threshold)
+        {
+            g_bThresholdReached = true;
+        }
     }
 }
 

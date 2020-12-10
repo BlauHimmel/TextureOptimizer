@@ -15,7 +15,7 @@
 
 const char * MESH_FPROP_ATLAS_INDEX = "atlasIdx";
 
-bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization parameterization, double clusterThreshold, const std::string & meshOutput, const std::string & textureOutput)
+bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization parameterization, double clusterThreshold, double omtThreshold, const std::string & meshOutput, const std::string & textureOutput)
 {
     if (m_pMesh == nullptr || m_pTexture == nullptr || !m_pTexture->IsValid())
     {
@@ -218,7 +218,7 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
     if (parameterization != EParameterization::ESMI04 && parameterization != EParameterization::EBarycentric)
     {
         Logger::Info("Further optimizing the merged mesh and the merged textures...");
-        if (!FurtherOptimizeAndWrite(&mergedMesh, &mergedTexture, optMergedMeshOutput, optMergedTextureOutput))
+        if (!FurtherOptimizeAndWrite(&mergedMesh, &mergedTexture, omtThreshold, optMergedMeshOutput, optMergedTextureOutput))
         {
             Logger::Error("Error occurred when further optimizing the merged mesh and the merged textures.");
             return false;
@@ -1054,7 +1054,7 @@ struct PointHasher
     }
 };
 
-bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, const Texture * pMergedTexture, const std::string & meshOutput, const std::string & textureOutput)
+bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, const Texture * pMergedTexture, double omtThreshold, const std::string & meshOutput, const std::string & textureOutput)
 {
     if (pMergedMesh == nullptr || pMergedTexture == nullptr)
     {
@@ -1105,7 +1105,7 @@ bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, co
         uvMesh.add_face(faceVHs);
     }
 
-    const size_t boundarySubdivisionTimes = 25;
+    const size_t boundarySubdivisionTimes = 50;
     const Real boundarySubdivisionDelta = 1.0 / static_cast<Real>(boundarySubdivisionTimes);
 
     auto boundaries = MeshBoundaryVertices(&uvMesh);
@@ -1411,7 +1411,7 @@ bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, co
         Logger::Error("Failed to initialize OMT2D.");
         return false;
     }
-    omt.Run();
+    omt.Run(omtThreshold);
 
     scaffoldUVMesh.request_face_status();
     scaffoldUVMesh.request_edge_status();

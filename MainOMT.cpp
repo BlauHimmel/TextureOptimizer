@@ -14,10 +14,12 @@ int main(int argc, const char ** argv)
 
     bool bShowHelp = false;
     std::string meshFilename, outputFilename;
+    double omtThreshold = 6e-6;
 
     auto cli = lyra::help(bShowHelp)
         | lyra::opt(meshFilename, "mesh")["-m"]["--mesh"]("File name of the input mesh").required()
-        | lyra::opt(outputFilename, "output")["-o"]["--output"]("Directory of the output files.").required();
+        | lyra::opt(outputFilename, "output")["-o"]["--output"]("Directory of the output files.").required()
+        | lyra::opt(omtThreshold, "stop")["-s"]["--stop"]("OMT stop threshold, usually be in range [4e-6~8e-6].").optional();
 
     auto result = cli.parse( {argc, argv} );
     if (!result)
@@ -31,6 +33,12 @@ int main(int argc, const char ** argv)
     {
         std::cout << cli << std::endl;
         return 0;
+    }
+
+    if (omtThreshold <= 0.0)
+    {
+        Logger::Warn("Paramter '-s = %lf' is smaller than 0.0, reset to default value 0.2", omtThreshold);
+        omtThreshold = 6e-6;
     }
 
     /* check input args */
@@ -77,7 +85,7 @@ int main(int argc, const char ** argv)
         return 1;
     }
 
-    omt.Run();
+    omt.Run(omtThreshold);
 
     /* ************************ run OMT ************************ */
 
