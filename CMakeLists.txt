@@ -68,6 +68,7 @@ SET(EXT_INCLUDE_DIRS
         Libraries/SMI04/include
         Libraries/HLBFGS/include
         Libraries/simpleSVG/include
+        Libraries/tinycolormap/include
         ${GLFW3_INCLUDE_DIR}
         ${MKL_INCLUDE_DIR})
 SET(INCLUDE_DIRS
@@ -89,7 +90,8 @@ SET(SOURCE_FILES
         Sources/ClusteringAlgorithm.cpp
         Sources/OMT.cpp
         Sources/Shader.cpp
-        Sources/Timer.cpp)
+        Sources/Timer.cpp
+        Sources/MeshMeasure.cpp)
 
 INCLUDE_DIRECTORIES(${INCLUDE_DIRS})
 

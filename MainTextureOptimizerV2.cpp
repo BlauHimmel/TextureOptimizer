@@ -28,7 +28,7 @@ int main(int argc, const char ** argv)
         | lyra::opt(parameterizationMethod, "parameterization")["-p"]["--param"]("Method used for parameterization: 0: Harmonic, 1: SLIM, 2: EBP, 3: SMI04.").required().choices(0, 1, 2, 3)
         | lyra::opt(outputTextureWidth, "width")["-x"]["--width"]("Width of the output texture.").optional()
         | lyra::opt(outputTextureHeight, "height")["-y"]["--height"]("Height of the output texture.").optional()
-        | lyra::opt(clusterThreshold, "cluster")["-c"]["--cluster"]("Cluster threshold (Small value leads to more cluster, should be greater than 0.2).").optional()
+        | lyra::opt(clusterThreshold, "cluster")["-c"]["--cluster"]("Cluster threshold (Small value leads to more cluster, should be greater than 0.0).").optional()
         | lyra::opt(omtThreshold, "stop")["-s"]["--stop"]("OMT stop threshold, usually be in range [4e-6~8e-6].").optional();
 
     auto result = cli.parse( {argc, argv} );
@@ -45,10 +45,10 @@ int main(int argc, const char ** argv)
         return 0;
     }
 
-    if (clusterThreshold < 0.2)
+    if (clusterThreshold <= 0.0)
     {
-        Logger::Warn("Paramter '-c = %lf' is smaller than 0.2, clamp to 0.2", clusterThreshold);
-        clusterThreshold = 0.2;
+        Logger::Warn("Paramter '-c = %lf' is smaller than 0.0, reset to default value 0.75", clusterThreshold);
+        clusterThreshold = 0.75;
     }
 
     if (omtThreshold <= 0.0)

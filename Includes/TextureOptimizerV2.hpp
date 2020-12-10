@@ -17,7 +17,7 @@ struct AtlasInfo
     std::unordered_map<size_t, std::set<int>> atlasFaces;
     size_t atlasNum = 0;
 };
-
+/* TODO: Single triangle submesh cause the program crash. */
 class TextureOptimizerV2
 {
 public:

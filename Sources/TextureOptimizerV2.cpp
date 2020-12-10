@@ -76,7 +76,7 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
 
     for (size_t i = 0; i < atlasInfo->atlasNum; i++)
     {
-        Logger::Info("Processing submesh %zd...", i);
+        Logger::Info("Processing submesh %zd (%zd vertices, %zd faces)...", i, subMeshes[i].n_vertices(), subMeshes[i].n_faces());
 
         m_pTexture->CopyTo(&subTextures[i]);
 
