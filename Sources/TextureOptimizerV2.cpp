@@ -3,9 +3,11 @@
 #include <unordered_set>
 #include <queue>
 #include <random>
+#include <filesystem>
 
 #include <finders_interface.h>
 #include <igl/triangle/triangulate.h>
+#include <simple_svg.hpp>
 
 #include "IglDebugViewer.hpp"
 #include "Logger.hpp"
@@ -15,7 +17,8 @@
 
 const char * MESH_FPROP_ATLAS_INDEX = "atlasIdx";
 
-bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization parameterization, double clusterThreshold, double omtThreshold, const std::string & meshOutput, const std::string & textureOutput)
+bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization parameterization, double clusterThreshold, double omtThreshold,
+    const std::string & meshOutput, const std::string & textureOutput)
 {
     if (m_pMesh == nullptr || m_pTexture == nullptr || !m_pTexture->IsValid())
     {
@@ -218,7 +221,7 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
     if (parameterization != EParameterization::ESMI04 && parameterization != EParameterization::EBarycentric)
     {
         Logger::Info("Further optimizing the merged mesh and the merged textures...");
-        if (!FurtherOptimizeAndWrite(&mergedMesh, &mergedTexture, omtThreshold, optMergedMeshOutput, optMergedTextureOutput))
+        if (!FurtherOptimizeAndWrite(&mergedMesh, &mergedTexture, atlasInfo->atlasNum, omtThreshold, optMergedMeshOutput, optMergedTextureOutput))
         {
             Logger::Error("Error occurred when further optimizing the merged mesh and the merged textures.");
             return false;
@@ -1031,19 +1034,23 @@ bool TextureOptimizerV2::MergeResultAndWriteV2(const TriMesh * pMeshes, const Te
         }
     }
 
+    std::filesystem::path textureOutputPath(textureOutput);
+    std::string atlasSVGOutput = textureOutputPath.replace_extension(".svg").string();
+
     OpenMesh::IO::Options wOpts;
     wOpts += OpenMesh::IO::Options::FaceTexCoord;
 
     bool bSuccessMesh = OpenMesh::IO::write_mesh(mergedMesh, meshOutput, wOpts);
     bool bSuccessTexture = mergedTexture.Write(textureOutput);
+    bool bSuccessAtlasSVG = WriteAtlasSVG(&mergedMesh, clusterNum, 1000, atlasSVGOutput);
 
-    if (bSuccessMesh && bSuccessTexture)
+    if (bSuccessMesh && bSuccessTexture && bSuccessAtlasSVG)
     {
         pMergedMesh->assign(mergedMesh, true);
         mergedTexture.CopyTo(pMergedTexture);
     }
 
-    return bSuccessMesh && bSuccessTexture;
+    return bSuccessMesh && bSuccessTexture && bSuccessAtlasSVG;
 }
 
 struct PointHasher
@@ -1054,7 +1061,8 @@ struct PointHasher
     }
 };
 
-bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, const Texture * pMergedTexture, double omtThreshold, const std::string & meshOutput, const std::string & textureOutput)
+bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, const Texture * pMergedTexture, size_t clusterNum,
+    double omtThreshold, const std::string & meshOutput, const std::string & textureOutput)
 {
     if (pMergedMesh == nullptr || pMergedTexture == nullptr)
     {
@@ -1448,12 +1456,16 @@ bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, co
         return false;
     }
 
+    std::filesystem::path textureOutputPath(textureOutput);
+    std::string atlasSVGOutput = textureOutputPath.replace_extension(".svg").string();
+
     OpenMesh::IO::Options wOpts;
     wOpts += OpenMesh::IO::Options::FaceTexCoord;
     bool bSuccessMesh = OpenMesh::IO::write_mesh(furtherOptMesh, meshOutput, wOpts);
     bool bSuccessTexture = furtherOptTexture.Write(textureOutput);
+    bool bSuccessAtlasSVG = WriteAtlasSVG(&furtherOptMesh, clusterNum, 1000, atlasSVGOutput);
 
-    return bSuccessMesh && bSuccessTexture;
+    return bSuccessMesh && bSuccessTexture && bSuccessAtlasSVG;
 }
 
 [[maybe_unused]] void TextureOptimizerV2::MergeAtlasInfoAndFProperty(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, size_t source, size_t target)
@@ -1580,4 +1592,45 @@ bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, co
     int32_t boundaryCount = 1;
     int32_t genus = (2 - euler - boundaryCount) / 2;
     return genus;
+}
+
+bool TextureOptimizerV2::WriteAtlasSVG(const TriMesh * pMesh, size_t atlasNum, size_t size, const std::string & output)
+{
+    if (pMesh == nullptr || atlasNum == 0 || size == 0)
+    {
+        return false;
+    }
+
+    std::vector<std::vector<OpenMesh::VertexHandle>> boundaryVertices = MeshBoundaryVertices(pMesh);
+
+    svg::Dimensions dimensions(size, size);
+    svg::Document doc(output, svg::Layout(dimensions, svg::Layout::BottomLeft));
+
+    svg::Polygon border(svg::Stroke(3, svg::Color::Black));
+    border << svg::Point(0, 0) << svg::Point(dimensions.width, 0) << svg::Point(dimensions.width, dimensions.height) << svg::Point(0, dimensions.height);
+    doc << border;
+
+    std::default_random_engine engine(pMesh->n_vertices());
+    std::uniform_int_distribution<int> uniform(0, 255);
+
+    for (const auto & boundaryVertex : boundaryVertices)
+    {
+        svg::Polygon atlasPolygon = svg::Polygon(svg::Color(uniform(engine), uniform(engine), uniform(engine)), svg::Stroke(2, svg::Color::Black));
+        for (const auto & vh : boundaryVertex)
+        {
+            for (const auto heh : pMesh->vih_range(vh))
+            {
+                if (!pMesh->is_boundary(heh))
+                {
+                    const auto & uv = pMesh->texcoord2D(heh);
+                    atlasPolygon << svg::Point(uv[0] * size, uv[1] * size);
+                    break;
+                }
+            }
+
+        }
+        doc << atlasPolygon;
+    }
+
+    return doc.save();
 }

@@ -67,6 +67,7 @@ SET(EXT_INCLUDE_DIRS
         Libraries/glm/include
         Libraries/SMI04/include
         Libraries/HLBFGS/include
+        Libraries/simpleSVG/include
         ${GLFW3_INCLUDE_DIR}
         ${MKL_INCLUDE_DIR})
 SET(INCLUDE_DIRS

@@ -22,7 +22,8 @@ class TextureOptimizerV2
 {
 public:
     TextureOptimizerV2(TriMesh * pMesh, Texture * pTexture) : m_pMesh(pMesh), m_pTexture(pTexture) { }
-    bool Run(uint32_t width, uint32_t height, EParameterization parameterization, double clusterThreshold, double omtThreshold, const std::string & meshOutput, const std::string & textureOutput);
+    bool Run(uint32_t width, uint32_t height, EParameterization parameterization, double clusterThreshold, double omtThreshold,
+        const std::string & meshOutput, const std::string & textureOutput);
 
 private:
     [[maybe_unused]] static std::unique_ptr<AtlasInfo> MarkAtlasIndex(TriMesh * pMesh);
@@ -37,7 +38,8 @@ private:
         size_t clusterNum, uint32_t mergedTextureWidth, uint32_t mergedTextureHeight,
         uint32_t mergedTextureChannels, const std::string & meshOutput, const std::string & textureOutput,
         TriMesh * pMergedMesh, Texture * pMergedTexture);
-    static bool FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, const Texture * pMergedTexture, double omtThreshold, const std::string & meshOutput, const std::string & textureOutput);
+    static bool FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, const Texture * pMergedTexture, size_t clusterNum,
+        double omtThreshold, const std::string & meshOutput, const std::string & textureOutput);
 
 private:
     [[maybe_unused]] static void MergeAtlasInfoAndFProperty(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, size_t source, size_t target);
@@ -46,6 +48,7 @@ private:
     [[maybe_unused]] static bool IsIntersect(const std::set<int> & edges0, const std::set<int> & edges1);
     [[maybe_unused]] static void SortAtlasSize(std::vector<std::pair<size_t, size_t>/*<atlasIdx, faceNum>*/> & atlasSizes);
     [[maybe_unused]] static int32_t GetAtlasGenus(AtlasInfo * pAtlasInfo, size_t atlasIdx);
+    static bool WriteAtlasSVG(const TriMesh * pMesh, size_t atlasNum, size_t size, const std::string & output);
 
 private:
     TriMesh * m_pMesh;
