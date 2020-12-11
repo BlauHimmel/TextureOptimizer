@@ -6,7 +6,7 @@
 class MeshMeasure
 {
 public:
-    static void AreaDistortion(const TriMesh * pMesh, const std::string & heatImageOutput, const std::string & statsOutput);
+    static void AreaDistortion(const TriMesh * pMesh, const std::string & statsOutput);
 };
 
 #endif //MESH_MEASURE_HPP

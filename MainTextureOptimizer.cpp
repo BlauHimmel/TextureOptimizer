@@ -7,6 +7,7 @@
 #include "TextureOptimizer.hpp"
 #include "Logger.hpp"
 #include "MeshUtils.hpp"
+#include "MeshMeasure.hpp"
 
 int main(int argc, const char ** argv)
 {
@@ -120,6 +121,11 @@ int main(int argc, const char ** argv)
     /* ************************ write texture ************************ */
 
     /* ************************ write mesh ************************ */
+
+    std::filesystem::path meshOutputPath(meshOutput);
+    std::string meshDistortionStatsOutput = meshOutputPath.replace_extension(".area.txt").string();
+
+    MeshMeasure::AreaDistortion(&mesh, meshDistortionStatsOutput);
 
     OpenMesh::IO::Options wOpts;
     wOpts += OpenMesh::IO::Options::FaceTexCoord;

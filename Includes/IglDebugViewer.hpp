@@ -9,4 +9,6 @@ void DisplayVF(const Eigen::MatrixXd & V, const Eigen::MatrixXi & F, const std::
 
 void DisplayVFC(const Eigen::MatrixXd & V, const Eigen::MatrixXi & F, const Eigen::MatrixXd & C, const std::string & title);
 
+void DisplayVFD(const Eigen::MatrixXd & V, const Eigen::MatrixXi & F, const Eigen::VectorXd & D, const std::string & title);
+
 #endif //IGL_DEBUG_VIEWER_HPP

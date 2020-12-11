@@ -14,6 +14,7 @@
 #include "ClusteringAlgorithm.hpp"
 #include "BarycentricParameterization.hpp"
 #include "OMT.hpp"
+#include "MeshMeasure.hpp"
 
 const char * MESH_FPROP_ATLAS_INDEX = "atlasIdx";
 
@@ -1459,6 +1460,11 @@ bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, co
         return false;
     }
 
+    std::filesystem::path meshOutputPath(meshOutput);
+    std::string meshDistortionStatsOutput = meshOutputPath.replace_extension(".area.txt").string();
+
+    MeshMeasure::AreaDistortion(&furtherOptMesh, meshDistortionStatsOutput);
+
     std::filesystem::path textureOutputPath(textureOutput);
     std::string atlasSVGOutput = textureOutputPath.replace_extension(".svg").string();
 
@@ -1630,7 +1636,6 @@ bool TextureOptimizerV2::WriteAtlasSVG(const TriMesh * pMesh, size_t atlasNum, s
                     break;
                 }
             }
-
         }
         doc << atlasPolygon;
     }

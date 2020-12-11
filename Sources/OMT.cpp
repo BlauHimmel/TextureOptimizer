@@ -346,7 +346,7 @@ void EVALFUNC([[maybe_unused]] int N, double * X, [[maybe_unused]] double * PREV
 }
 
 /* Used for HLBFGS */
-void NEWITERATION(int ITER, [[maybe_unused]] int CALL_ITER, [[maybe_unused]] double * X, [[maybe_unused]] double * F, [[maybe_unused]] double * G, double * GNORM) // NOLINT(readability-non-const-parameter)
+void NEWITERATION(int ITER, [[maybe_unused]] int CALL_ITER, [[maybe_unused]] double * X, [[maybe_unused]] double * F, [[maybe_unused]] double * G, [[maybe_unused]] double * GNORM)
 {
     g_pGlobalPointer->GLFWLoopBegin();
     g_pGlobalPointer->DrawPowerDiagramScreen();
@@ -864,11 +864,11 @@ void OMT2D::InitTargetArea(const TriMesh * pMesh, std::vector<float> & targetAre
     for (const auto & fh : pMesh->faces())
     {
         TriMesh::Point points[3];
-        size_t Index = 0;
+        size_t index = 0;
 
         for (const auto & vh : pMesh->fv_range(fh))
         {
-            points[Index++] = pMesh->point(vh);
+            points[index++] = pMesh->point(vh);
         }
 
         const auto & va = points[0];
@@ -888,11 +888,11 @@ void OMT2D::InitTargetArea(const TriMesh * pMesh, std::vector<float> & targetAre
         for (const auto & fh : pMesh->vf_range(vh))
         {
             TriMesh::Point points[3];
-            size_t Index = 0;
+            size_t index = 0;
 
             for (const auto & fhvh : pMesh->fv_range(fh))
             {
-                points[Index++] = pMesh->point(fhvh);
+                points[index++] = pMesh->point(fhvh);
             }
 
             const auto & va = points[0];

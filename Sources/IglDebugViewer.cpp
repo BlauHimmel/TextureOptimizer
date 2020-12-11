@@ -79,7 +79,7 @@ void DisplayAtlas(TriMesh * pMesh, size_t atlasNum, const std::string & atlasIdx
     viewer.data().set_mesh(V, F);
     viewer.data().set_colors(C);
     viewer.core().background_color = { 1.0f, 1.0f, 1.0f, 0.0f };
-    viewer.launch(true, false, title, 1000, 1000);
+    viewer.launch(false, false, title, 1000, 1000);
 }
 
 void DisplayVF(const Eigen::MatrixXd & V, const Eigen::MatrixXi & F, const std::string & title)
@@ -87,7 +87,7 @@ void DisplayVF(const Eigen::MatrixXd & V, const Eigen::MatrixXi & F, const std::
     igl::opengl::glfw::Viewer viewer;
     viewer.data().set_mesh(V, F);
     viewer.core().background_color = { 1.0f, 1.0f, 1.0f, 0.0f };
-    viewer.launch(true, false, title, 1000, 1000);
+    viewer.launch(false, false, title, 1000, 1000);
 }
 
 void DisplayVFC(const Eigen::MatrixXd & V, const Eigen::MatrixXi & F, const Eigen::MatrixXd & C, const std::string & title)
@@ -96,5 +96,14 @@ void DisplayVFC(const Eigen::MatrixXd & V, const Eigen::MatrixXi & F, const Eige
     viewer.data().set_mesh(V, F);
     viewer.data().set_colors(C);
     viewer.core().background_color = { 1.0f, 1.0f, 1.0f, 0.0f };
-    viewer.launch(true, false, title, 1000, 1000);
+    viewer.launch(false, false, title, 1000, 1000);
+}
+
+void DisplayVFD(const Eigen::MatrixXd & V, const Eigen::MatrixXi & F, const Eigen::VectorXd & D, const std::string & title)
+{
+    igl::opengl::glfw::Viewer viewer;
+    viewer.data().set_mesh(V, F);
+    viewer.data().set_data(D, igl::COLOR_MAP_TYPE_JET);
+    viewer.core().background_color = { 1.0f, 1.0f, 1.0f, 0.0f };
+    viewer.launch(false, false, title, 1000, 1000);
 }
