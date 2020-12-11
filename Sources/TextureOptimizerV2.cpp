@@ -30,7 +30,10 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
     Logger::Info("<RemoveSmallComponent> Completed!");
 
     Logger::Info("Repairing non-manifold vertices of the mesh...");
-    RepairNonManifold(m_pMesh);
+    if (RepairNonManifold(m_pMesh) > 0)
+    {
+        RemoveSmallComponent(m_pMesh);
+    }
     Logger::Info("<RepairNonManifold> Completed!");
 
     Logger::Info("Clustering the mesh...");
@@ -1468,7 +1471,7 @@ bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, co
     return bSuccessMesh && bSuccessTexture && bSuccessAtlasSVG;
 }
 
-[[maybe_unused]] void TextureOptimizerV2::MergeAtlasInfoAndFProperty(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, size_t source, size_t target)
+void TextureOptimizerV2::MergeAtlasInfoAndFProperty(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, size_t source, size_t target)
 {
     std::set<int> & atlasEdges1 = pAtlasInfo->atlasEdges[source];
     pAtlasInfo->atlasEdges[target].insert(atlasEdges1.begin(), atlasEdges1.end());
@@ -1560,7 +1563,7 @@ bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, co
     return intersectLength;
 }
 
-[[maybe_unused]] bool TextureOptimizerV2::IsIntersect(const std::set<int> & edges0, const std::set<int> & edges1)
+bool TextureOptimizerV2::IsIntersect(const std::set<int> & edges0, const std::set<int> & edges1)
 {
     bool bConnected = false;
     for (int edge0 : edges0)

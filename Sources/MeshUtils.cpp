@@ -206,9 +206,9 @@ void RemoveSmallComponent(TriMesh * pMesh)
     Logger::Info("Component %zd (%zd vertices) was reserved, others were removed.", maxComponentIdx, maxComponentVertexNum);
 }
 
-void RepairNonManifold(TriMesh * pMesh)
+uint32_t RepairNonManifold(TriMesh * pMesh)
 {
-    if (pMesh == nullptr) { return; }
+    if (pMesh == nullptr) { return 0; }
 
     std::vector<OpenMesh::VertexHandle> nonManifoldVHs;
     for (auto vh : pMesh->vertices())
@@ -221,7 +221,7 @@ void RepairNonManifold(TriMesh * pMesh)
 
     Logger::Info("%zd non-manifold vertices found!", nonManifoldVHs.size());
 
-    if (nonManifoldVHs.empty()) { return; }
+    if (nonManifoldVHs.empty()) { return 0; }
 
     uint32_t newVertexNum = 0;
 
@@ -326,6 +326,7 @@ void RepairNonManifold(TriMesh * pMesh)
     pMesh->release_vertex_status();
 
     Logger::Info("Non-manifold fixed, %u new vertices created!", newVertexNum);
+    return newVertexNum;
 }
 
 bool CutToDisk(TriMesh * pMesh, const Real * pTotalArea, size_t seedFaceNum)

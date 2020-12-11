@@ -42,10 +42,10 @@ private:
         double omtThreshold, const std::string & meshOutput, const std::string & textureOutput);
 
 private:
-    [[maybe_unused]] static void MergeAtlasInfoAndFProperty(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, size_t source, size_t target);
+    static void MergeAtlasInfoAndFProperty(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, size_t source, size_t target);
     [[maybe_unused]] static void RemapAtlasInfoKeyInSequence(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, const std::set<size_t> & atlasIdxSet);
     [[maybe_unused]] static size_t IntersectNum(const std::set<int> & edges0, const std::set<int> & edges1);
-    [[maybe_unused]] static bool IsIntersect(const std::set<int> & edges0, const std::set<int> & edges1);
+    static bool IsIntersect(const std::set<int> & edges0, const std::set<int> & edges1);
     [[maybe_unused]] static void SortAtlasSize(std::vector<std::pair<size_t, size_t>/*<atlasIdx, faceNum>*/> & atlasSizes);
     [[maybe_unused]] static int32_t GetAtlasGenus(AtlasInfo * pAtlasInfo, size_t atlasIdx);
     static bool WriteAtlasSVG(const TriMesh * pMesh, size_t atlasNum, size_t size, const std::string & output);
