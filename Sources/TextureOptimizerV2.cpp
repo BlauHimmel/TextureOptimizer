@@ -1366,10 +1366,10 @@ bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, co
         const auto & vb = points[1];
         const auto & vc = points[2];
 
-        auto lab = va - vb;
-        auto lac = vc - vb;
+        auto lba = va - vb;
+        auto lbc = vc - vb;
 
-        Real area = lab.cross(lac).norm() * 0.5;
+        Real area = lba.cross(lbc).norm() * 0.5;
 
         if (fh.idx() < uvMesh.n_faces())
         {
@@ -1398,10 +1398,10 @@ bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, co
             const auto & vb = points[1];
             const auto & vc = points[2];
 
-            auto lab = va - vb;
-            auto lac = vc - vb;
+            auto lba = va - vb;
+            auto lbc = vc - vb;
 
-            Real area = lab.cross(lac).norm() * 0.5;
+            Real area = lba.cross(lbc).norm() * 0.5;
 
             if (fh.idx() < uvMesh.n_faces())
             {
@@ -1461,9 +1461,11 @@ bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, co
     }
 
     std::filesystem::path meshOutputPath(meshOutput);
-    std::string meshDistortionStatsOutput = meshOutputPath.replace_extension(".area.txt").string();
+    std::string meshAreaDistortionStatsOutput = meshOutputPath.replace_extension(".area.txt").string();
+    std::string meshAngleDistortionStatsOutput = meshOutputPath.replace_extension(".angle.txt").string();
 
-    MeshMeasure::AreaDistortion(&furtherOptMesh, meshDistortionStatsOutput);
+    MeshMeasure::AreaDistortion(&furtherOptMesh, meshAreaDistortionStatsOutput);
+    MeshMeasure::AngleDistortion(&furtherOptMesh, meshAngleDistortionStatsOutput);
 
     std::filesystem::path textureOutputPath(textureOutput);
     std::string atlasSVGOutput = textureOutputPath.replace_extension(".svg").string();

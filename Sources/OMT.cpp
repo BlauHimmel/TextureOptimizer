@@ -875,10 +875,10 @@ void OMT2D::InitTargetArea(const TriMesh * pMesh, std::vector<float> & targetAre
         const auto & vb = points[1];
         const auto & vc = points[2];
 
-        auto lab = va - vb;
-        auto lac = vc - vb;
+        auto lba = va - vb;
+        auto lbc = vc - vb;
 
-        Real area = lab.cross(lac).norm() * 0.5;
+        Real area = lba.cross(lbc).norm() * 0.5;
         totalMeshArea += area;
     }
 
@@ -899,10 +899,10 @@ void OMT2D::InitTargetArea(const TriMesh * pMesh, std::vector<float> & targetAre
             const auto & vb = points[1];
             const auto & vc = points[2];
 
-            auto lab = va - vb;
-            auto lac = vc - vb;
+            auto lba = va - vb;
+            auto lbc = vc - vb;
 
-            Real area = lab.cross(lac).norm() * 0.5;
+            Real area = lba.cross(lbc).norm() * 0.5;
             oneRingMeshArea += area / 3.0;
         }
 
