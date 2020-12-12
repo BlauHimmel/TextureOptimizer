@@ -1461,10 +1461,12 @@ bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, co
     }
 
     std::string meshAreaDistortionStatsOutput = std::filesystem::path(meshOutput).replace_extension(".area.txt").string();
+    std::string meshAreaDistortionFigureOutput = std::filesystem::path(meshOutput).replace_extension(".area.svg").string();
     std::string meshAngleDistortionStatsOutput = std::filesystem::path(meshOutput).replace_extension(".angle.txt").string();
+    std::string meshAngleDistortionFigureOutput = std::filesystem::path(meshOutput).replace_extension(".angle.svg").string();
 
-    MeshMeasure::AreaDistortion(&furtherOptMesh, meshAreaDistortionStatsOutput);
-    MeshMeasure::AngleDistortion(&furtherOptMesh, meshAngleDistortionStatsOutput);
+    MeshMeasure::AreaDistortion(&furtherOptMesh, meshAreaDistortionStatsOutput, meshAreaDistortionFigureOutput);
+    MeshMeasure::AngleDistortion(&furtherOptMesh, meshAngleDistortionStatsOutput, meshAngleDistortionFigureOutput);
 
     std::filesystem::path textureOutputPath(textureOutput);
     std::string atlasSVGOutput = textureOutputPath.replace_extension(".svg").string();

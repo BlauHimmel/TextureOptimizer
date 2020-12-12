@@ -17,3 +17,8 @@ https://github.com/oneapi-src/oneTBB/releases
 - Download intel's MKL package from the official website.
 - Run the installer of intel's MKL.
 - Set environment variable 'MKLDIR=<where you install MKL>/IntelSWTools/compilers_and_libraries_xxxx/windows/mkl'
+
+## Python3
+
+- Install Python3.
+- Install numpy and matplotlib using 'python -m pip install <module_name>'.

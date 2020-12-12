@@ -6,8 +6,8 @@
 class MeshMeasure
 {
 public:
-    static void AreaDistortion(const TriMesh * pMesh, const std::string & statsOutput);
-    static void AngleDistortion(const TriMesh * pMesh, const std::string & statsOutput);
+    static void AreaDistortion(const TriMesh * pMesh, const std::string & statsOutput, const std::string & figureOutput);
+    static void AngleDistortion(const TriMesh * pMesh, const std::string & statsOutput, const std::string & figureOutput);
 
 };
 

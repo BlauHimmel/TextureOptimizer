@@ -1,12 +1,13 @@
-#pragma warning(disable:4067)
+#pragma warning(disable:4067 4244)
 #include "MeshMeasure.hpp"
 
 #include <tinycolormap.hpp>
+#include <matplotlibcpp.h>
 
 #include "IglDebugViewer.hpp"
 #include "Logger.hpp"
 
-void MeshMeasure::AreaDistortion(const TriMesh * pMesh, const std::string & statsOutput)
+void MeshMeasure::AreaDistortion(const TriMesh * pMesh, const std::string & statsOutput, const std::string & figureOutput)
 {
     std::vector<float> areaDistortions(pMesh->n_vertices(), 0.0f);
 
@@ -173,9 +174,16 @@ void MeshMeasure::AreaDistortion(const TriMesh * pMesh, const std::string & stat
     }
     statsFile.close();
     Logger::Info("Successfully write area distortion file: \"%s\"!", statsOutput.c_str());
+
+    matplotlibcpp::figure_size(480, 360);
+    matplotlibcpp::hist(areaDistortions, 1000);
+    matplotlibcpp::title("Area distortion");
+    matplotlibcpp::save(figureOutput);
+    matplotlibcpp::show();
+    Logger::Info("Successfully write area distortion figure: \"%s\"!", figureOutput.c_str());
 }
 
-void MeshMeasure::AngleDistortion(const TriMesh * pMesh, const std::string & statsOutput)
+void MeshMeasure::AngleDistortion(const TriMesh * pMesh, const std::string & statsOutput, const std::string & figureOutput)
 {
     std::vector<float> angleDistortions(pMesh->n_vertices(), 0.0f);
 
@@ -347,4 +355,11 @@ void MeshMeasure::AngleDistortion(const TriMesh * pMesh, const std::string & sta
     }
     statsFile.close();
     Logger::Info("Successfully write angle distortion file: \"%s\"!", statsOutput.c_str());
+
+    matplotlibcpp::figure_size(480, 360);
+    matplotlibcpp::hist(angleDistortions, 1000);
+    matplotlibcpp::title("Angle distortion");
+    matplotlibcpp::save(figureOutput);
+    matplotlibcpp::show();
+    Logger::Info("Successfully write angle distortion figure: \"%s\"!", figureOutput.c_str());
 }
