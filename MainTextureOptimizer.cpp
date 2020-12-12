@@ -122,9 +122,8 @@ int main(int argc, const char ** argv)
 
     /* ************************ write mesh ************************ */
 
-    std::filesystem::path meshOutputPath(meshOutput);
-    std::string meshAreaDistortionStatsOutput = meshOutputPath.replace_extension(".area.txt").string();
-    std::string meshAngleDistortionStatsOutput = meshOutputPath.replace_extension(".angle.txt").string();
+    std::string meshAreaDistortionStatsOutput = std::filesystem::path(meshOutput).replace_extension(".area.txt").string();
+    std::string meshAngleDistortionStatsOutput = std::filesystem::path(meshOutput).replace_extension(".angle.txt").string();
 
     MeshMeasure::AreaDistortion(&mesh, meshAreaDistortionStatsOutput);
     MeshMeasure::AngleDistortion(&mesh, meshAngleDistortionStatsOutput);
