@@ -6,6 +6,7 @@
 
 #include "IglDebugViewer.hpp"
 #include "Logger.hpp"
+#include "MeshUtils.hpp"
 
 void MeshMeasure::AreaDistortion(const TriMesh * pMesh, const std::string & statsOutput, const std::string & figureOutput)
 {
@@ -611,4 +612,104 @@ void MeshMeasure::SymmetricDirichletDistortion(const TriMesh * pMesh, const std:
     matplotlibcpp::save(figureOutput);
     matplotlibcpp::show();
     Logger::Info("Successfully write symmetric Dirichlet distortion figure: \"%s\"!", figureOutput.c_str());
+}
+
+void MeshMeasure::EnergyStats(const TriMesh * pMesh, size_t clusterNum, const std::string & statsOutput)
+{
+    TriMesh uvMesh;
+    std::vector<OpenMesh::VertexHandle> vhs;
+    vhs.reserve(pMesh->n_vertices());
+
+    for (const auto vh : pMesh->vertices())
+    {
+        TriMesh::TexCoord2D uv;
+        for (const auto heh : pMesh->vih_range(vh))
+        {
+            if (!pMesh->is_boundary(heh))
+            {
+                uv = pMesh->texcoord2D(heh);
+                break;
+            }
+        }
+
+        for (const auto heh : pMesh->vih_range(vh))
+        {
+            if (!pMesh->is_boundary(heh))
+            {
+                if (pMesh->texcoord2D(heh) != uv)
+                {
+                    Logger::Error("Multiple different texcoords assigned to single vertex!");
+                    return;
+                }
+            }
+        }
+
+        const auto newVH = uvMesh.add_vertex({uv[0], uv[1], 0.0});
+        vhs.push_back(newVH);
+    }
+
+    for (const auto fh : pMesh->faces())
+    {
+        std::vector<OpenMesh::VertexHandle> faceVHs;
+        for (const auto vh : pMesh->fv_range(fh))
+        {
+            faceVHs.push_back(vhs[vh.idx()]);
+        }
+        uvMesh.add_face(faceVHs);
+    }
+
+    std::vector<std::vector<OpenMesh::VertexHandle>> componentsVHs = MeshComponentVertices(&uvMesh);
+    Real totalArea = 1.0;
+    Real atlasArea = 0.0;
+    for (const auto & componentsVH : componentsVHs)
+    {
+        std::set<OpenMesh::FaceHandle> componentFHs;
+        for (const auto & vh : componentsVH)
+        {
+            for (const auto fh : uvMesh.vf_range(vh))
+            {
+                componentFHs.insert(fh);
+            }
+        }
+        for (const auto & fh : componentFHs)
+        {
+            atlasArea += uvMesh.calc_face_area(fh);
+        }
+    }
+
+    double PE = atlasArea / totalArea;
+
+    std::vector<Real> boundaryDistances = MeshBoundaryDistances(pMesh);
+    Real boundaryTotalDistance = 0.0;
+    for (Real boundaryDistance : boundaryDistances)
+    {
+        boundaryTotalDistance += boundaryDistance;
+    }
+
+    Real xMin =  std::numeric_limits<Real>::max();
+    Real yMin =  std::numeric_limits<Real>::max();
+    Real zMin =  std::numeric_limits<Real>::max();
+    Real xMax = -std::numeric_limits<Real>::max();
+    Real yMax = -std::numeric_limits<Real>::max();
+    Real zMax = -std::numeric_limits<Real>::max();
+
+    for (const auto & vh : pMesh->vertices())
+    {
+        const auto & point = pMesh->point(vh);
+        xMin = std::min(xMin, point[0]);
+        yMin = std::min(yMin, point[1]);
+        zMin = std::min(zMin, point[2]);
+        xMax = std::max(xMax, point[0]);
+        yMax = std::max(yMax, point[1]);
+        zMax = std::max(zMax, point[2]);
+    }
+
+    Real diagonalAABB = std::sqrt(std::pow(xMax - xMin, 2.0) + std::pow(yMax - yMin, 2.0) + std::pow(zMax - zMin, 2.0));
+    double BL = boundaryTotalDistance / diagonalAABB;
+
+    std::ofstream energyStatsFile(statsOutput);
+    energyStatsFile << "Cluster Num: " << clusterNum << std::endl;
+    energyStatsFile << "PE: " << PE << std::endl;
+    energyStatsFile << "BL: " << BL << std::endl;
+    energyStatsFile.close();
 }

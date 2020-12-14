@@ -665,7 +665,7 @@ std::unique_ptr<AtlasInfo> TextureOptimizerV2::MeshClustering(TriMesh * pMesh, d
         return nullptr;
     }
 
-    std::vector<std::vector<int>> clusters = ClusteringAlgorithm::Cluster(pMesh, 4 * 4, clusterThreshold);
+    std::vector<std::vector<int>> clusters = ClusteringAlgorithm::Cluster(pMesh, 3 * 3, clusterThreshold);
 
     OpenMesh::FPropHandleT<size_t> atlasIdxFProp;
     pMesh->add_property(atlasIdxFProp, MESH_FPROP_ATLAS_INDEX);
@@ -1466,10 +1466,12 @@ bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, co
     std::string meshAngleDistortionFigureOutput = std::filesystem::path(meshOutput).replace_extension(".angle.svg").string();
     std::string meshSymDirichletDistortionStatsOutput = std::filesystem::path(meshOutput).replace_extension(".symdirichlet.txt").string();
     std::string meshSymDirichletDistortionFigureOutput = std::filesystem::path(meshOutput).replace_extension(".symdirichlet.svg").string();
+    std::string meshEnergyStatsOutput = std::filesystem::path(meshOutput).replace_extension(".energy.txt").string();
 
     MeshMeasure::AreaDistortion(&furtherOptMesh, meshAreaDistortionStatsOutput, meshAreaDistortionFigureOutput);
     MeshMeasure::AngleDistortion(&furtherOptMesh, meshAngleDistortionStatsOutput, meshAngleDistortionFigureOutput);
     MeshMeasure::SymmetricDirichletDistortion(&furtherOptMesh, meshSymDirichletDistortionStatsOutput, meshSymDirichletDistortionFigureOutput);
+    MeshMeasure::EnergyStats(&furtherOptMesh, clusterNum, meshEnergyStatsOutput);
 
     std::filesystem::path textureOutputPath(textureOutput);
     std::string atlasSVGOutput = textureOutputPath.replace_extension(".svg").string();
