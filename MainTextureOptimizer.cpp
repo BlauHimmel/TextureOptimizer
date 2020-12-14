@@ -126,9 +126,12 @@ int main(int argc, const char ** argv)
     std::string meshAreaDistortionFigureOutput = std::filesystem::path(meshOutput).replace_extension(".area.svg").string();
     std::string meshAngleDistortionStatsOutput = std::filesystem::path(meshOutput).replace_extension(".angle.txt").string();
     std::string meshAngleDistortionFigureOutput = std::filesystem::path(meshOutput).replace_extension(".angle.svg").string();
+    std::string meshSymDirichletDistortionStatsOutput = std::filesystem::path(meshOutput).replace_extension(".symdirichlet.txt").string();
+    std::string meshSymDirichletDistortionFigureOutput = std::filesystem::path(meshOutput).replace_extension(".symdirichlet.svg").string();
 
     MeshMeasure::AreaDistortion(&mesh, meshAreaDistortionStatsOutput, meshAreaDistortionFigureOutput);
     MeshMeasure::AngleDistortion(&mesh, meshAngleDistortionStatsOutput, meshAngleDistortionFigureOutput);
+    MeshMeasure::SymmetricDirichletDistortion(&mesh, meshSymDirichletDistortionStatsOutput, meshSymDirichletDistortionFigureOutput);
 
     OpenMesh::IO::Options wOpts;
     wOpts += OpenMesh::IO::Options::FaceTexCoord;
