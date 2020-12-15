@@ -614,6 +614,109 @@ void MeshMeasure::SymmetricDirichletDistortion(const TriMesh * pMesh, const std:
     Logger::Info("Successfully write symmetric Dirichlet distortion figure: \"%s\"!", figureOutput.c_str());
 }
 
+/* Atlas refinement with bounded packing efficiency (Sec. 4) */
+double ComputeSignalApproximationError(const TriMesh * pMesh, const TriMesh * pUVMesh, const Eigen::Vector3d & bboxMin, const Eigen::Vector3d & bboxMax)
+{
+    const double splitN = 8.0;
+    const double checkerDivide = 100.0;
+    const double textureSize = 4096.0;
+
+    Eigen::Vector3d gridLength = (bboxMax - bboxMin) / checkerDivide;
+    double deltaU = (bboxMax - bboxMin).maxCoeff() / textureSize;
+    double deltaV = (bboxMax - bboxMin).maxCoeff() / textureSize;
+
+    auto GetcolorFunc = [&](const Eigen::Vector3d & pt)
+    {
+        auto pt1 = (pt - bboxMin).cwiseQuotient(gridLength) ;
+        bool block = (((std::lround(std::floor(pt1[0])) + std::lround(std::floor(pt1[1])) + std::lround(std::floor(pt1[2]))) & 1) == 0);
+        return block ? Eigen::Vector3d(1.0, 1.0, 1.0) : Eigen::Vector3d(0.0, 0.0, 0.0);
+    };
+
+    auto GetInteriorPointFunc = [](const std::vector<Eigen::Vector3d> & vList, double u, double v)
+    {
+        return u * vList[0] + v * vList[1] + (1.0 - u - v) * vList[2];
+    };
+
+    auto SignalErrorFunc = [&](const std::vector<Eigen::Vector3d> & vList, const std::vector<Eigen::Vector3d> & uvList, int i0, int j0, int i1, int j1, int i2, int j2)
+    {
+        std::vector<Eigen::Vector3d> pt(3), ptColor(3);
+        double divisor = 1.0 / splitN;
+
+        pt[0] = GetInteriorPointFunc(uvList, i0 * divisor, j0 * divisor);
+        pt[1] = GetInteriorPointFunc(uvList, i1 * divisor, j1 * divisor);
+        pt[2] = GetInteriorPointFunc(uvList, i2 * divisor, j2 * divisor);
+
+        ptColor[0] = GetcolorFunc(GetInteriorPointFunc(vList, i0 * divisor, j0 * divisor));
+        ptColor[1] = GetcolorFunc(GetInteriorPointFunc(vList, i1 * divisor, j1 * divisor));
+        ptColor[2] = GetcolorFunc(GetInteriorPointFunc(vList, i2 * divisor, j2 * divisor));
+
+        Eigen::Matrix3d paraMat;
+        Eigen::Matrix3d signalMat;
+
+        for (int i = 0; i < 3; i++)
+        {
+            paraMat(0, i) = pt[i][0] / deltaU;
+            paraMat(1, i) = pt[i][1] / deltaV;
+            paraMat(2, i) = 1.0;
+
+            signalMat(0, i) = ptColor[i][0];
+            signalMat(1, i) = ptColor[i][1];
+            signalMat(2, i) = ptColor[i][2];
+        }
+
+        Eigen::Matrix3d jacobianMat = signalMat * paraMat.inverse();
+        return jacobianMat.col(0).squaredNorm() + jacobianMat.col(1).squaredNorm();
+    };
+
+    double error = 0.0;
+    double totalArea = 0.0;
+    for (auto fh : pMesh->faces())
+    {
+        double faceArea = pMesh->calc_sector_area(*(pMesh->cfh_begin(fh)));
+        totalArea += faceArea;
+        faceArea /= splitN * splitN;
+
+        std::vector<Eigen::Vector3d> vList, uvList;
+        vList.reserve(3);
+        uvList.reserve(3);
+        for (const auto & heh : pMesh->fh_range(fh))
+        {
+            vList.push_back(pMesh->point(pMesh->to_vertex_handle(heh)));
+            uvList.push_back(pUVMesh->point(pUVMesh->to_vertex_handle(heh)));
+        }
+
+        double faceError = 0.0;
+        for (int j = 0; j <= splitN; j++)
+        {
+            for (int k = 0; k <= splitN - j; k++)
+            {
+                if (j + k < splitN)
+                {
+                    double signalError = SignalErrorFunc(vList, uvList, j, k, j + 1, k, j, k + 1);
+                    if (signalError < 1e16)
+                    {
+                        //Logger::Test("signalError1 = %lf", signalError);
+                        faceError += faceArea * signalError;
+                    }
+                }
+                if (j > 0 && k > 0)
+                {
+                    double signalError = SignalErrorFunc(vList, uvList, j, k, j - 1, k, j, k - 1);
+                    if (signalError < 1e16)
+                    {
+                        //Logger::Test("signalError2 = %lf", signalError);
+                        faceError += faceArea * signalError;
+                    }
+                }
+            }
+        }
+        error += faceError;
+    }
+
+    error /= 12.0 * totalArea;
+    return error;
+}
+
 void MeshMeasure::EnergyStats(const TriMesh * pMesh, size_t clusterNum, const std::string & statsOutput)
 {
     TriMesh uvMesh;
@@ -659,25 +762,14 @@ void MeshMeasure::EnergyStats(const TriMesh * pMesh, size_t clusterNum, const st
     }
 
     std::vector<std::vector<OpenMesh::VertexHandle>> componentsVHs = MeshComponentVertices(&uvMesh);
-    Real totalArea = 1.0;
+    Real totalAtlasArea = 1.0;
     Real atlasArea = 0.0;
-    for (const auto & componentsVH : componentsVHs)
+    for (const auto & fh : uvMesh.faces())
     {
-        std::set<OpenMesh::FaceHandle> componentFHs;
-        for (const auto & vh : componentsVH)
-        {
-            for (const auto fh : uvMesh.vf_range(vh))
-            {
-                componentFHs.insert(fh);
-            }
-        }
-        for (const auto & fh : componentFHs)
-        {
-            atlasArea += uvMesh.calc_face_area(fh);
-        }
+        atlasArea += uvMesh.calc_face_area(fh);
     }
 
-    double PE = atlasArea / totalArea;
+    double PE = atlasArea / totalAtlasArea;
 
     std::vector<Real> boundaryDistances = MeshBoundaryDistances(pMesh);
     Real boundaryTotalDistance = 0.0;
@@ -707,9 +799,39 @@ void MeshMeasure::EnergyStats(const TriMesh * pMesh, size_t clusterNum, const st
     Real diagonalAABB = std::sqrt(std::pow(xMax - xMin, 2.0) + std::pow(yMax - yMin, 2.0) + std::pow(zMax - zMin, 2.0));
     double BL = boundaryTotalDistance / diagonalAABB;
 
+    std::vector<Jacobian::Singular> singularValues = Jacobian::ComputeSingularValues(pMesh);
+    Real totalMeshArea = 0.0;
+    std::vector<Real> faceAreas(pMesh->n_faces(), 0.0);
+    for (const auto & fh : pMesh->faces())
+    {
+        faceAreas[fh.idx()] = pMesh->calc_face_area(fh);
+        totalMeshArea += faceAreas[fh.idx()];
+    }
+
+    double Ed = 0.0;
+    for (size_t i = 0; i < pMesh->n_faces(); i++)
+    {
+        double sigma1 = singularValues[i].first;
+        double sigma2 = singularValues[i].second;
+        if (sigma1 != 0.0 && sigma2 != 0.0)
+        {
+            double symDirichlet = std::pow(sigma1, 2.0) + std::pow(sigma2, 2.0) + std::pow(sigma1, -2.0) + std::pow(sigma2, -2.0);
+            if (symDirichlet < 1e16)
+            {
+                Ed += (0.25 * (faceAreas[i] / totalMeshArea) * symDirichlet);
+            }
+        }
+    }
+
+    Eigen::Vector3d bboxMin(xMin, yMin, zMin);
+    Eigen::Vector3d bboxMax(xMax, yMax, zMax);
+    double SAE = ComputeSignalApproximationError(pMesh, &uvMesh, bboxMin, bboxMax);
+
     std::ofstream energyStatsFile(statsOutput);
     energyStatsFile << "Cluster Num: " << clusterNum << std::endl;
     energyStatsFile << "PE: " << PE << std::endl;
     energyStatsFile << "BL: " << BL << std::endl;
+    energyStatsFile << "Ed: " << Ed << std::endl;
+    energyStatsFile << "SAE: " << SAE << std::endl;
     energyStatsFile.close();
 }
