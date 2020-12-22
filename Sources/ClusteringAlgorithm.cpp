@@ -62,6 +62,20 @@ std::vector<std::vector<int>> ClusteringAlgorithm::Cluster(TriMesh * pMesh, size
         V(i, 2) = point[2];
     }
 
+    std::vector<double> faceAreas;
+    for (int i = 0; i < pMesh->n_faces(); i++)
+    {
+        const auto fh = TriMesh::FaceHandle(i);
+        faceAreas.push_back(static_cast<double>(pMesh->calc_face_area(fh)));
+    }
+
+    std::vector<double> edgeLengths;
+    for (int i = 0; i < pMesh->n_edges(); i++)
+    {
+        const auto eh = TriMesh::EdgeHandle(i);
+        edgeLengths.push_back(static_cast<double>(pMesh->calc_edge_length(eh)));
+    }
+
     std::vector<DualNodeType> dualNodes;
     std::unordered_set<int> valid;
     for (int i = 0; i < F.rows(); ++i)
@@ -84,7 +98,7 @@ std::vector<std::vector<int>> ClusteringAlgorithm::Cluster(TriMesh * pMesh, size
         const auto & p = dualEdges[i];
         const DualNodeType & n1 = dualNodes[p.first];
         const DualNodeType & n2 = dualNodes[p.second];
-        double cost = EvaluateCost(n1, n2);
+        double cost = EvaluateCost(n1, n2, faceAreas, edgeLengths, pMesh);
         pq.push({ -cost, i });
 
         dualAdjacencyList[p.first].push_back(p.second);
@@ -112,7 +126,7 @@ std::vector<std::vector<int>> ClusteringAlgorithm::Cluster(TriMesh * pMesh, size
                 newNeighborhood.push_back(neighbor);
                 dualAdjacencyList[neighbor].push_back(newID);
 
-                double newCost = EvaluateCost(dualNodes[ndID0], dualNodes[neighbor]);
+                double newCost = EvaluateCost(dualNodes[ndID0], dualNodes[neighbor], faceAreas, edgeLengths, pMesh);
                 pq.push({ -newCost, static_cast<int>(dualEdges.size()) });
                 dualEdges.emplace_back(neighbor, newID);
             }
@@ -125,7 +139,7 @@ std::vector<std::vector<int>> ClusteringAlgorithm::Cluster(TriMesh * pMesh, size
                 newNeighborhood.push_back(neighbor);
                 dualAdjacencyList[neighbor].push_back(newID);
 
-                double newCost = EvaluateCost(dualNodes[ndID1], dualNodes[neighbor]);
+                double newCost = EvaluateCost(dualNodes[ndID1], dualNodes[neighbor], faceAreas, edgeLengths, pMesh);
                 pq.push({ -newCost, static_cast<int>(dualEdges.size()) });
                 dualEdges.emplace_back(neighbor, newID);
             }
@@ -166,7 +180,7 @@ void ClusteringAlgorithm::GetDualEdges(const Eigen::MatrixXd & V, const Eigen::M
     }
 }
 
-double ClusteringAlgorithm::EvaluateCost(const DualNodeType & dn1, const DualNodeType & dn2)
+double ClusteringAlgorithm::EvaluateCost(const DualNodeType & dn1, const DualNodeType & dn2, const std::vector<double> & faceAreas, const std::vector<double> & edgeLengths, TriMesh * pMesh)
 {
     Eigen::Matrix3d A = dn1.A + dn2.A;
     Eigen::Vector3d b = dn1.b + dn2.b;
@@ -202,6 +216,84 @@ double ClusteringAlgorithm::EvaluateCost(const DualNodeType & dn1, const DualNod
 
     Eigen::Vector3d n = eigenVectors[0];
     double d = -n.transpose().dot(b) / c;
+    double energyFit = ((n.transpose().eval() * A).dot(n) + 2 * d * n.transpose().eval().dot(b)) / c + d * d;
 
-    return ((n.transpose().eval() * A).dot(n) + 2 * d * n.transpose().eval().dot(b)) / c + d * d;
+    double area1 = 0.0;
+    for (int faceIdx : dn1.faces)
+    {
+        area1 += faceAreas[faceIdx];
+    }
+
+    double perimeter1 = 0.0;
+    std::vector<int> edgeCount1(pMesh->n_edges(), 0);
+    std::set<int> boundaryEdge1;
+    for (int faceIdx : dn1.faces)
+    {
+        const auto fh = TriMesh::FaceHandle(faceIdx);
+        for (const auto eh : pMesh->fe_range(fh))
+        {
+            edgeCount1[eh.idx()]++;
+            if (edgeCount1[eh.idx()] == 1)
+            {
+                boundaryEdge1.insert(eh.idx());
+            }
+            else
+            {
+                boundaryEdge1.erase(eh.idx());
+            }
+        }
+    }
+    for (int i : boundaryEdge1)
+    {
+        perimeter1 += edgeLengths[i];
+    }
+
+    double area2 = 0.0;
+    for (int faceIdx : dn2.faces)
+    {
+        area2 += faceAreas[faceIdx];
+    }
+
+    double perimeter2 = 0.0;
+    std::vector<int> edgeCount2(pMesh->n_edges(), 0);
+    std::set<int> boundaryEdge2;
+    for (int faceIdx : dn2.faces)
+    {
+        const auto fh = TriMesh::FaceHandle(faceIdx);
+        for (const auto eh : pMesh->fe_range(fh))
+        {
+            edgeCount2[eh.idx()]++;
+            if (edgeCount2[eh.idx()] == 1)
+            {
+                boundaryEdge2.insert(eh.idx());
+            }
+            else
+            {
+                boundaryEdge2.erase(eh.idx());
+            }
+        }
+    }
+    for (int i : boundaryEdge2)
+    {
+        perimeter2 += edgeLengths[i];
+    }
+
+    double area = area1 + area2;
+    double perimeter = 0.0;
+
+    for (size_t i = 0; i < pMesh->n_edges(); i++)
+    {
+        if ((edgeCount1[i] == 1 || edgeCount2[i] == 1) && edgeCount1[i] + edgeCount2[i] == 1)
+        {
+            perimeter += edgeLengths[i];
+        }
+    }
+
+    double irregularity1 = (perimeter1 * perimeter1) / (4.0 * M_PI * area1);
+    double irregularity2 = (perimeter2 * perimeter2) / (4.0 * M_PI * area2);
+    double irregularity = (perimeter * perimeter) / (4.0 * M_PI * area);
+
+    double energyShape = (irregularity - std::max(irregularity1, irregularity2)) / irregularity;
+
+    return energyFit + energyShape;
 }

@@ -25,7 +25,7 @@ public:
 
 private:
     static void GetDualEdges(const Eigen::MatrixXd & V, const Eigen::MatrixXi & F, std::vector<std::pair<int, int>> & dualEdges);
-    static double EvaluateCost(const DualNodeType & dn1, const DualNodeType & dn2);
+    static double EvaluateCost(const DualNodeType & dn1, const DualNodeType & dn2, const std::vector<double> & faceAreas, const std::vector<double> & edgeLengths, TriMesh * pMesh);
 };
 
 #endif //CLUSTERING_ALGORITHM_HPP

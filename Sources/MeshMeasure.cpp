@@ -695,7 +695,6 @@ double ComputeSignalApproximationError(const TriMesh * pMesh, const TriMesh * pU
                     double signalError = SignalErrorFunc(vList, uvList, j, k, j + 1, k, j, k + 1);
                     if (signalError < 1e16)
                     {
-                        //Logger::Test("signalError1 = %lf", signalError);
                         faceError += faceArea * signalError;
                     }
                 }
@@ -704,7 +703,6 @@ double ComputeSignalApproximationError(const TriMesh * pMesh, const TriMesh * pU
                     double signalError = SignalErrorFunc(vList, uvList, j, k, j - 1, k, j, k - 1);
                     if (signalError < 1e16)
                     {
-                        //Logger::Test("signalError2 = %lf", signalError);
                         faceError += faceArea * signalError;
                     }
                 }
