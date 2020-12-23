@@ -510,7 +510,7 @@ void MeshMeasure::SymmetricDirichletDistortion(const TriMesh * pMesh, const std:
         }
         else
         {
-            symmetricDirichletDistortions[i] = std::abs(std::log(0.25 * (std::pow(singularValues[i].first, 2) + std::pow(singularValues[i].second, 2) +
+            symmetricDirichletDistortions[i] = 0.25 * std::abs(std::log(0.25 * (std::pow(singularValues[i].first, 2) + std::pow(singularValues[i].second, 2) +
                 std::pow(singularValues[i].first, -2) + std::pow(singularValues[i].second, -2))));
         }
     }
@@ -523,7 +523,7 @@ void MeshMeasure::SymmetricDirichletDistortion(const TriMesh * pMesh, const std:
         minDistortion = std::min(minDistortion, symmetricDirichletDistortion);
     }
 
-    maxDistortion = 4.0f;
+    maxDistortion = 1.0f;
 
     std::vector<float> normalizedSymmetricDirichletDistortions(pMesh->n_faces(), 0.0f);
     for (size_t i = 0; i < normalizedSymmetricDirichletDistortions.size(); i++)
