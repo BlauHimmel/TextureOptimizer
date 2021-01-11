@@ -115,7 +115,7 @@ std::vector<std::vector<int>> ClusteringAlgorithm::Cluster(TriMesh * pMesh, size
         V(i, 2) = point[2];
     }
 
-    std::vector<double> faceAreas;
+    /*std::vector<double> faceAreas;
     for (int i = 0; i < pMesh->n_faces(); i++)
     {
         const auto fh = TriMesh::FaceHandle(i);
@@ -127,7 +127,7 @@ std::vector<std::vector<int>> ClusteringAlgorithm::Cluster(TriMesh * pMesh, size
     {
         const auto eh = TriMesh::EdgeHandle(i);
         edgeLengths.push_back(static_cast<double>(pMesh->calc_edge_length(eh)));
-    }
+    }*/
 
     std::unordered_set<int> valid;
     std::vector<DualNodeType> dualNodes(F.rows());
