@@ -89,7 +89,10 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
         Logger::Info("<RemoveSmallComponent> Completed [%zd]!", i);
 
         Logger::Info("Repairing non-manifold vertices of the submesh [%zd]...", i);
-        RepairNonManifold(&subMeshes[i]);
+        if (RepairNonManifold(&subMeshes[i]) > 0)
+        {
+            RemoveSmallComponent(&subMeshes[i]);
+        }
         Logger::Info("<RepairNonManifold> Completed [%zd]!", i);
 
         if (!IsDiskTopology(&subMeshes[i]))
