@@ -1,9 +1,11 @@
+#pragma warning(disable:4067 4244)
 #include "OMT.hpp"
 
 #include <memory>
 #include <random>
 
 #include <HLBFGS.h>
+#include <matplotlibcpp.h>
 
 #include "Logger.hpp"
 
@@ -348,13 +350,14 @@ void EVALFUNC([[maybe_unused]] int N, double * X, [[maybe_unused]] double * PREV
 /* Used for HLBFGS */
 void NEWITERATION(int ITER, [[maybe_unused]] int CALL_ITER, [[maybe_unused]] double * X, [[maybe_unused]] double * F, [[maybe_unused]] double * G, [[maybe_unused]] double * GNORM)
 {
-    g_pGlobalPointer->GLFWLoopBegin();
+    g_pGlobalPointer->GLFWLoopBegin(true, false);
     g_pGlobalPointer->DrawPowerDiagramScreen();
     g_pGlobalPointer->GLFWLoopEnd();
 
     double error = g_pGlobalPointer->ComputeError();
     uint32_t missingPointNum = g_pGlobalPointer->ComputeMissingPointNum();
-    Logger::Info("HLBFGS: Iterations: %d, Error = %.8f, Missing Point = %u.", ITER - 1, error, missingPointNum);
+    Logger::Info("HLBFGS: Iterations: %d, Error = %.8f, Missing Point = %u, Elapsed: %s.",
+                 ITER - 1, error, missingPointNum, g_pGlobalPointer->GetElapsedTimeString().c_str());
 
     if (error <= g_Threshold)
     {
@@ -374,7 +377,7 @@ void NEWITERATION(int ITER, [[maybe_unused]] int CALL_ITER, [[maybe_unused]] dou
 
 /*******************************************************************************************************/
 
-bool OMT2D::Initialize()
+bool OMT2D::Initialize(int maxIterationsHLBFGS)
 {
     if (!InitializeOpenGL())
     {
@@ -408,7 +411,7 @@ bool OMT2D::Initialize()
     /* The LBFGS strategy. 0: standard, 1 : M1QN3 strategy[8](recommended). */
     INFO[3] = 1;
     /* The max number of iterations */
-    INFO[4] = 400;
+    INFO[4] = maxIterationsHLBFGS;
     /* 1: print message, 0: do nothing */
     INFO[5] = 0;
     /* The update interval of Hessian. (typical choices : 0 - 200) */
@@ -666,13 +669,18 @@ void OMT2D::Run(double threshold)
     m_TotalTimer.Reset();
     m_FrameCount = 0.0;
 
+    m_ErrorsHLBFGS.clear();
+    m_ErrorsGradientDescent.clear();
+    m_MissingPointHLBFGS.clear();
+    m_MissingPointGradientDescent.clear();
+
     SetVariableFromGPUBuffer();
     HLBFGS(int(m_pMesh->n_vertices()), M, Variable.data(), EVALFUNC, nullptr, HLBFGS_UPDATE_Hessian, NEWITERATION, PARAMETER, INFO);
 
     int32_t iterations = 1;
     while (!glfwWindowShouldClose(m_pWindow) && !g_bThresholdReached)
     {
-        GLFWLoopBegin();
+        GLFWLoopBegin(false, true);
         ComputePlaneZRange();
         DrawPowerDiagramBack();
         DrawPowerDiagramScreen();
@@ -756,7 +764,7 @@ void OMT2D::ComputeGradientAndFunctionValFromGPUBuffer(double * G, double * F)
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
-void OMT2D::GLFWLoopBegin()
+void OMT2D::GLFWLoopBegin(bool bStoreHLBFGSInfo, bool bStoreGradientDescentInfo)
 {
     m_FrameCount += 1.0;
     if (m_FPSTimer.Elapsed() >= 1000.0)
@@ -771,6 +779,18 @@ void OMT2D::GLFWLoopBegin()
         std::string title = Logger::Format("OMT %u Iter./Sec, Err. = %.8f , Miss.: %u, Elap.: %s. (Close the window to stop the iteration)",
             m_FPS, error, missingPointNum, m_TotalTimer.ElapsedString(true).c_str());
         glfwSetWindowTitle(m_pWindow, title.c_str());
+
+        if (bStoreGradientDescentInfo)
+        {
+            m_ErrorsGradientDescent.emplace_back(GetElapsedTime(), error);
+            m_MissingPointGradientDescent.emplace_back(GetElapsedTime(), missingPointNum);
+        }
+
+        if (bStoreHLBFGSInfo)
+        {
+            m_ErrorsHLBFGS.emplace_back(GetElapsedTime(), error);
+            m_MissingPointHLBFGS.emplace_back(GetElapsedTime(), missingPointNum);
+        }
 
         if (error <= g_Threshold)
         {
@@ -801,6 +821,16 @@ void OMT2D::SetVariableFromGPUBuffer()
     }
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+}
+
+double OMT2D::GetElapsedTime()
+{
+    return m_TotalTimer.Elapsed();
+}
+
+std::string OMT2D::GetElapsedTimeString()
+{
+    return m_TotalTimer.ElapsedString(true);
 }
 
 bool OMT2D::CheckInitParameterization(const TriMesh * pMesh)
@@ -1284,4 +1314,116 @@ void OMT2D::ComputeCellSite()
     }
 }
 
+void OMT2D::WriteHLBFGSErrorInfo(const std::string & filename)
+{
+    std::ofstream file(filename);
+    for (const auto & pair : m_ErrorsHLBFGS)
+    {
+        file << pair.first << " " << pair.second << std::endl;
+    }
+    file.close();
+    Logger::Info("Successfully write HLBFGS error info: \"%s\"!", filename.c_str());
+}
 
+void OMT2D::WriteGradientDescentErrorInfo(const std::string & filename)
+{
+    std::ofstream file(filename);
+    for (const auto & pair : m_ErrorsGradientDescent)
+    {
+        file << pair.first << " " << pair.second << std::endl;
+    }
+    file.close();
+    Logger::Info("Successfully write gradient descent error info: \"%s\"!", filename.c_str());
+}
+
+void OMT2D::WriteHLBFGSMissingPointInfo(const std::string & filename)
+{
+    std::ofstream file(filename);
+    for (const auto & pair : m_MissingPointHLBFGS)
+    {
+        file << pair.first << " " << pair.second << std::endl;
+    }
+    file.close();
+    Logger::Info("Successfully write HLBFGS missing point info: \"%s\"!", filename.c_str());
+}
+
+void OMT2D::WriteGradientDescentMissingPointInfo(const std::string & filename)
+{
+    std::ofstream file(filename);
+    for (const auto & pair : m_MissingPointGradientDescent)
+    {
+        file << pair.first << " " << pair.second << std::endl;
+    }
+    file.close();
+    Logger::Info("Successfully write gradient descent missing point info: \"%s\"!", filename.c_str());
+}
+
+void OMT2D::ShowAndSaveErrorFigure(const std::string & filename)
+{
+    std::vector<double> x1, y1;
+    std::vector<double> x2, y2;
+    x1.reserve(m_ErrorsHLBFGS.size());
+    y1.reserve(m_ErrorsHLBFGS.size());
+    x2.reserve(m_ErrorsGradientDescent.size() + 1);
+    y2.reserve(m_ErrorsGradientDescent.size() + 1);
+
+    for (const auto & error : m_ErrorsHLBFGS)
+    {
+        x1.push_back(error.first / 1000.0);
+        y1.push_back(error.second);
+    }
+
+    x2.push_back(x1.back());
+    y2.push_back(y1.back());
+
+    for (const auto & error : m_ErrorsGradientDescent)
+    {
+        x2.push_back(error.first / 1000.0);
+        y2.push_back(error.second);
+    }
+
+    matplotlibcpp::figure_size(480, 360);
+    matplotlibcpp::named_plot("LBFGS", x1, y1);
+    matplotlibcpp::named_plot("Gradient Descent", x2, y2);
+    matplotlibcpp::title(R"(L2 Error $\nabla E(\mathbf{h})^2$)");
+    matplotlibcpp::save(filename);
+    matplotlibcpp::show();
+    Logger::Info("Successfully write omt error figure: \"%s\"!", filename.c_str());
+}
+
+void OMT2D::ShowAndSaveMissingPointFigure(const std::string & filename)
+{
+    std::vector<double> x1, y1;
+    std::vector<double> x2, y2;
+    x1.reserve(m_MissingPointHLBFGS.size());
+    y1.reserve(m_MissingPointHLBFGS.size());
+    x2.reserve(m_MissingPointGradientDescent.size() + 2);
+    y2.reserve(m_MissingPointGradientDescent.size() + 2);
+
+    for (const auto & error : m_MissingPointHLBFGS)
+    {
+        x1.push_back(error.first / 1000.0);
+        y1.push_back(error.second);
+    }
+
+    x2.push_back(x1.back());
+    y2.push_back(y1.back());
+
+    for (const auto & error : m_MissingPointGradientDescent)
+    {
+        x2.push_back(error.first / 1000.0);
+        y2.push_back(error.second);
+    }
+
+    x2.push_back(x2.back() + 1);
+    y2.push_back(1);
+
+    matplotlibcpp::figure_size(480, 360);
+    matplotlibcpp::named_plot("LBFGS", x1, y1);
+    matplotlibcpp::named_plot("Gradient Descent", x2, y2);
+    matplotlibcpp::title("Singular Point");
+    matplotlibcpp::save(filename);
+    matplotlibcpp::show();
+
+    Logger::Info("Successfully write omt missing point figure: \"%s\"!", filename.c_str());
+}

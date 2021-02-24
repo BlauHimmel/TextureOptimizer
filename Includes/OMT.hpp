@@ -15,7 +15,7 @@ public:
     explicit OMT2D(TriMesh * pMesh) : m_pMesh(pMesh) { }
     OMT2D(TriMesh * pMesh, std::vector<float> targetAreas) : m_pMesh(pMesh), m_TargetAreas(std::move(targetAreas)), m_bTargetAreaAssignedWhenConstruct(true) { }
 
-    bool Initialize();
+    bool Initialize(int maxIterationsHLBFGS = 400);
     bool InitializeOpenGL();
     bool InitializeGPUBuffer();
     void Run(double threshold);
@@ -26,13 +26,17 @@ public:
     /* Used for HLBFGS */
     void ComputeGradientAndFunctionValFromGPUBuffer(double * G, double * F);
     /* Used for HLBFGS */
-    void GLFWLoopBegin();
+    void GLFWLoopBegin(bool bStoreHLBFGSInfo, bool bStoreGradientDescentInfo);
     /* Used for HLBFGS */
     void GLFWLoopEnd();
     /* Used for HLBFGS */
     bool GLFWShouldClose();
     /* Used for HLBFGS */
     void SetVariableFromGPUBuffer();
+    /* Used for HLBFGS */
+    double GetElapsedTime();
+    /* Used for HLBFGS */
+    std::string GetElapsedTimeString();
     /* Used for HLBFGS */
     double PARAMETER[20] = { 0.0 };
     /* Used for HLBFGS */
@@ -70,6 +74,12 @@ public:
     uint32_t ComputeMissingPointNum();
     void ComputeCellSite();
 
+    void WriteHLBFGSErrorInfo(const std::string & filename);
+    void WriteGradientDescentErrorInfo(const std::string & filename);
+    void WriteHLBFGSMissingPointInfo(const std::string & filename);
+    void WriteGradientDescentMissingPointInfo(const std::string & filename);
+    void ShowAndSaveErrorFigure(const std::string & filename);
+    void ShowAndSaveMissingPointFigure(const std::string & filename);
 private:
     TriMesh * m_pMesh = nullptr;
     GLFWwindow * m_pWindow = nullptr;
@@ -78,6 +88,10 @@ private:
     uint32_t m_FPS = 0u;
     Timer m_FPSTimer, m_TotalTimer;
     double m_FrameCount = 0.0f;
+    std::vector<std::pair<double, double>> m_ErrorsHLBFGS;
+    std::vector<std::pair<double, double>> m_ErrorsGradientDescent;
+    std::vector<std::pair<double, uint32_t>> m_MissingPointHLBFGS;
+    std::vector<std::pair<double, uint32_t>> m_MissingPointGradientDescent;
 
     std::vector<float> m_TargetAreas;
     std::vector<Plane> m_InitialPlanes;

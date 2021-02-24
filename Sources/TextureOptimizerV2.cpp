@@ -1428,6 +1428,22 @@ bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, co
     }
     omt.Run(omtThreshold);
 
+    std::string omtErrorFigureOutput = std::filesystem::path(meshOutput).replace_extension(".error.svg").string();
+    std::string hlbfgsErrorOutput = std::filesystem::path(meshOutput).replace_extension(".hlbfgs.error.txt").string();
+    std::string gradientDescentErrorOutput = std::filesystem::path(meshOutput).replace_extension(".gd.error.txt").string();
+
+    std::string omtMissFigureOutput = std::filesystem::path(meshOutput).replace_extension(".miss.svg").string();
+    std::string hlbfgsMissOutput = std::filesystem::path(meshOutput).replace_extension(".hlbfgs.miss.txt").string();
+    std::string gradientDescentMissOutput = std::filesystem::path(meshOutput).replace_extension(".gd.miss.txt").string();
+
+    omt.ShowAndSaveErrorFigure(omtErrorFigureOutput);
+    omt.WriteHLBFGSErrorInfo(hlbfgsErrorOutput);
+    omt.WriteGradientDescentErrorInfo(gradientDescentErrorOutput);
+
+    omt.ShowAndSaveMissingPointFigure(omtMissFigureOutput);
+    omt.WriteHLBFGSMissingPointInfo(hlbfgsMissOutput);
+    omt.WriteGradientDescentMissingPointInfo(gradientDescentMissOutput);
+
     scaffoldUVMesh.request_face_status();
     scaffoldUVMesh.request_edge_status();
     scaffoldUVMesh.request_vertex_status();
