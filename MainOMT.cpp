@@ -15,11 +15,13 @@ int main(int argc, const char ** argv)
     bool bShowHelp = false;
     std::string meshFilename, outputFilename;
     double omtThreshold = 6e-6;
+    int maxIterationsHLBFGS = 400;
 
     auto cli = lyra::help(bShowHelp)
         | lyra::opt(meshFilename, "mesh")["-m"]["--mesh"]("File name of the input mesh").required()
         | lyra::opt(outputFilename, "output")["-o"]["--output"]("Directory of the output files.").required()
-        | lyra::opt(omtThreshold, "stop")["-s"]["--stop"]("OMT stop threshold, usually be in range [4e-6~8e-6].").optional();
+        | lyra::opt(omtThreshold, "stop")["-s"]["--stop"]("OMT stop threshold, usually be in range [4e-6~8e-6].").optional()
+        | lyra::opt(maxIterationsHLBFGS, "iterations")["-i"]["--iter"]("Max iterations of HLBFGS.").optional();
 
     auto result = cli.parse( {argc, argv} );
     if (!result)
@@ -87,7 +89,7 @@ int main(int argc, const char ** argv)
 
     OMT2D omt(&mesh);
 
-    if (!omt.Initialize())
+    if (!omt.Initialize(maxIterationsHLBFGS))
     {
         Logger::Error("Failed to initialize OMT2D.");
         return 1;

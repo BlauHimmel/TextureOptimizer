@@ -698,7 +698,10 @@ void OMT2D::Run(double threshold)
         Logger::Info("User manually stop the iterations.");
     }
 
+    Logger::Info("Applying optimal mass transport map...");
     ComputeCellSite();
+    Logger::Info("Apply completed.");
+
     glfwTerminate();
 
     g_pGlobalPointer = nullptr;
@@ -1361,11 +1364,8 @@ void OMT2D::WriteGradientDescentMissingPointInfo(const std::string & filename)
 void OMT2D::ShowAndSaveErrorFigure(const std::string & filename)
 {
     std::vector<double> x1, y1;
-    std::vector<double> x2, y2;
     x1.reserve(m_ErrorsHLBFGS.size());
     y1.reserve(m_ErrorsHLBFGS.size());
-    x2.reserve(m_ErrorsGradientDescent.size() + 1);
-    y2.reserve(m_ErrorsGradientDescent.size() + 1);
 
     for (const auto & error : m_ErrorsHLBFGS)
     {
@@ -1373,8 +1373,15 @@ void OMT2D::ShowAndSaveErrorFigure(const std::string & filename)
         y1.push_back(error.second);
     }
 
-    x2.push_back(x1.back());
-    y2.push_back(y1.back());
+    std::vector<double> x2, y2;
+    x2.reserve(m_ErrorsGradientDescent.size() + 1);
+    y2.reserve(m_ErrorsGradientDescent.size() + 1);
+
+    if (!m_ErrorsHLBFGS.empty())
+    {
+        x2.push_back(x1.back());
+        y2.push_back(y1.back());
+    }
 
     for (const auto & error : m_ErrorsGradientDescent)
     {
@@ -1383,10 +1390,17 @@ void OMT2D::ShowAndSaveErrorFigure(const std::string & filename)
     }
 
     matplotlibcpp::figure_size(480, 360);
-    matplotlibcpp::named_plot("LBFGS", x1, y1);
-    matplotlibcpp::named_plot("Gradient Descent", x2, y2);
-    matplotlibcpp::title(R"(L2 Error $\nabla E(\mathbf{h})^2$)");
+    if (!m_ErrorsHLBFGS.empty())
+    {
+        matplotlibcpp::named_plot("LBFGS", x1, y1);
+    }
+    if (!m_ErrorsGradientDescent.empty())
+    {
+        matplotlibcpp::named_plot("Gradient Descent", x2, y2);
+    }
+    matplotlibcpp::title(R"(L2 Error $\left\|\nabla E(\mathbf{h})\right\|^2$)");
     matplotlibcpp::save(filename);
+    matplotlibcpp::legend();
     matplotlibcpp::show();
     Logger::Info("Successfully write omt error figure: \"%s\"!", filename.c_str());
 }
@@ -1394,11 +1408,8 @@ void OMT2D::ShowAndSaveErrorFigure(const std::string & filename)
 void OMT2D::ShowAndSaveMissingPointFigure(const std::string & filename)
 {
     std::vector<double> x1, y1;
-    std::vector<double> x2, y2;
     x1.reserve(m_MissingPointHLBFGS.size());
     y1.reserve(m_MissingPointHLBFGS.size());
-    x2.reserve(m_MissingPointGradientDescent.size() + 2);
-    y2.reserve(m_MissingPointGradientDescent.size() + 2);
 
     for (const auto & error : m_MissingPointHLBFGS)
     {
@@ -1406,8 +1417,15 @@ void OMT2D::ShowAndSaveMissingPointFigure(const std::string & filename)
         y1.push_back(error.second);
     }
 
-    x2.push_back(x1.back());
-    y2.push_back(y1.back());
+    std::vector<double> x2, y2;
+    x2.reserve(m_MissingPointGradientDescent.size() + 2);
+    y2.reserve(m_MissingPointGradientDescent.size() + 2);
+
+    if (!m_MissingPointHLBFGS.empty())
+    {
+        x2.push_back(x1.back());
+        y2.push_back(y1.back());
+    }
 
     for (const auto & error : m_MissingPointGradientDescent)
     {
@@ -1416,13 +1434,20 @@ void OMT2D::ShowAndSaveMissingPointFigure(const std::string & filename)
     }
 
     x2.push_back(x2.back() + 1);
-    y2.push_back(1);
+    y2.push_back(0);
 
     matplotlibcpp::figure_size(480, 360);
-    matplotlibcpp::named_plot("LBFGS", x1, y1);
-    matplotlibcpp::named_plot("Gradient Descent", x2, y2);
+    if (!m_MissingPointHLBFGS.empty())
+    {
+        matplotlibcpp::named_plot("LBFGS", x1, y1);
+    }
+    if (!m_MissingPointGradientDescent.empty())
+    {
+        matplotlibcpp::named_plot("Gradient Descent", x2, y2);
+    }
     matplotlibcpp::title("Singular Point");
     matplotlibcpp::save(filename);
+    matplotlibcpp::legend();
     matplotlibcpp::show();
 
     Logger::Info("Successfully write omt missing point figure: \"%s\"!", filename.c_str());
