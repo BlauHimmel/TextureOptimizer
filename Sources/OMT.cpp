@@ -1369,7 +1369,7 @@ void OMT2D::ShowAndSaveErrorFigure(const std::string & filename)
 
     for (const auto & error : m_ErrorsHLBFGS)
     {
-        x1.push_back(error.first / 1000.0);
+        x1.push_back(error.first / 10000.0);
         y1.push_back(error.second);
     }
 
@@ -1385,22 +1385,24 @@ void OMT2D::ShowAndSaveErrorFigure(const std::string & filename)
 
     for (const auto & error : m_ErrorsGradientDescent)
     {
-        x2.push_back(error.first / 1000.0);
+        x2.push_back(error.first / 10000.0);
         y2.push_back(error.second);
     }
 
-    matplotlibcpp::figure_size(480, 360);
     if (!m_ErrorsHLBFGS.empty())
     {
-        matplotlibcpp::named_plot("LBFGS", x1, y1);
+        std::map<std::string, std::string> keywords = {{"label", "LBFGS"}};
+        matplotlibcpp::plot(x1, y1, keywords);
     }
     if (!m_ErrorsGradientDescent.empty())
     {
-        matplotlibcpp::named_plot("Gradient Descent", x2, y2);
+        std::map<std::string, std::string> keywords = {{"label", "Gradient Descent"}};
+        matplotlibcpp::plot(x2, y2, keywords);
     }
-    matplotlibcpp::title(R"(L2 Error $\left\|\nabla E(\mathbf{h})\right\|^2$)");
-    matplotlibcpp::save(filename);
+    matplotlibcpp::xlabel("time (s)");
+    matplotlibcpp::ylabel(R"(L2 Error $\left\|\nabla E(\mathbf{h})\right\|^2$)");
     matplotlibcpp::legend();
+    matplotlibcpp::save(filename);
     matplotlibcpp::show();
     Logger::Info("Successfully write omt error figure: \"%s\"!", filename.c_str());
 }
@@ -1413,7 +1415,7 @@ void OMT2D::ShowAndSaveMissingPointFigure(const std::string & filename)
 
     for (const auto & error : m_MissingPointHLBFGS)
     {
-        x1.push_back(error.first / 1000.0);
+        x1.push_back(error.first / 10000.0);
         y1.push_back(error.second);
     }
 
@@ -1429,14 +1431,13 @@ void OMT2D::ShowAndSaveMissingPointFigure(const std::string & filename)
 
     for (const auto & error : m_MissingPointGradientDescent)
     {
-        x2.push_back(error.first / 1000.0);
+        x2.push_back(error.first / 10000.0);
         y2.push_back(error.second);
     }
 
     x2.push_back(x2.back() + 1);
     y2.push_back(0);
 
-    matplotlibcpp::figure_size(480, 360);
     if (!m_MissingPointHLBFGS.empty())
     {
         matplotlibcpp::named_plot("LBFGS", x1, y1);
@@ -1445,9 +1446,10 @@ void OMT2D::ShowAndSaveMissingPointFigure(const std::string & filename)
     {
         matplotlibcpp::named_plot("Gradient Descent", x2, y2);
     }
-    matplotlibcpp::title("Singular Point");
-    matplotlibcpp::save(filename);
+    matplotlibcpp::xlabel("time (s)");
+    matplotlibcpp::ylabel("Singular Point");
     matplotlibcpp::legend();
+    matplotlibcpp::save(filename);
     matplotlibcpp::show();
 
     Logger::Info("Successfully write omt missing point figure: \"%s\"!", filename.c_str());
