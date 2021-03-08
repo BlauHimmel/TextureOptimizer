@@ -9,6 +9,8 @@
 
 #include "Logger.hpp"
 
+#include "stb_image_write.h"
+
 /*******************************************************************************************************/
 
 const char * pComputePlaneZRangeShaderVS = R"(
@@ -702,6 +704,9 @@ void OMT2D::Run(double threshold)
     ComputeCellSite();
     Logger::Info("Apply completed.");
 
+    m_RenderTargetPixel.reset(new uint8_t[m_ClientWidth * m_ClientHeight * 4 * sizeof(uint8_t)]);
+    glReadPixels(0, 0, m_ClientWidth, m_ClientHeight, GL_RGBA, GL_UNSIGNED_BYTE, m_RenderTargetPixel.get());
+
     glfwTerminate();
 
     g_pGlobalPointer = nullptr;
@@ -1389,6 +1394,7 @@ void OMT2D::ShowAndSaveErrorFigure(const std::string & filename)
         y2.push_back(error.second);
     }
 
+    /*matplotlibcpp::figure();
     if (!m_ErrorsHLBFGS.empty())
     {
         std::map<std::string, std::string> keywords = {{"label", "LBFGS"}};
@@ -1404,6 +1410,10 @@ void OMT2D::ShowAndSaveErrorFigure(const std::string & filename)
     matplotlibcpp::legend();
     matplotlibcpp::save(filename);
     matplotlibcpp::show();
+    matplotlibcpp::clf();
+    matplotlibcpp::cla();
+    matplotlibcpp::close();*/
+
     Logger::Info("Successfully write omt error figure: \"%s\"!", filename.c_str());
 }
 
@@ -1438,19 +1448,33 @@ void OMT2D::ShowAndSaveMissingPointFigure(const std::string & filename)
     x2.push_back(x2.back() + 1);
     y2.push_back(0);
 
+    /*matplotlibcpp::figure();
     if (!m_MissingPointHLBFGS.empty())
     {
-        matplotlibcpp::named_plot("LBFGS", x1, y1);
+        std::map<std::string, std::string> keywords = {{"label", "LBFGS"}};
+        matplotlibcpp::plot(x1, y1, keywords);
     }
     if (!m_MissingPointGradientDescent.empty())
     {
-        matplotlibcpp::named_plot("Gradient Descent", x2, y2);
+        std::map<std::string, std::string> keywords = {{"label", "Gradient Descent"}};
+        matplotlibcpp::plot(x2, y2, keywords);
     }
     matplotlibcpp::xlabel("time (s)");
     matplotlibcpp::ylabel("Singular Point");
     matplotlibcpp::legend();
     matplotlibcpp::save(filename);
     matplotlibcpp::show();
+    matplotlibcpp::clf();
+    matplotlibcpp::cla();
+    matplotlibcpp::close();*/
 
     Logger::Info("Successfully write omt missing point figure: \"%s\"!", filename.c_str());
+}
+
+void OMT2D::WriteCellDecompositionImage(const std::string & filename)
+{
+    stbi_flip_vertically_on_write(true);
+    stbi_write_png(filename.c_str(), m_ClientWidth, m_ClientHeight, 4, m_RenderTargetPixel.get(), 0);
+
+    Logger::Info("Successfully write omt cell image: \"%s\"!", filename.c_str());
 }

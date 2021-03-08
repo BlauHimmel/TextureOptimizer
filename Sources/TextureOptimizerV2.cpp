@@ -1420,6 +1420,18 @@ bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, co
         targetAreas[vh.idx()] = static_cast<float>(oneRingMeshArea / totalMeshArea * totalTargetArea);
     }
 
+    {
+        std::string scaffoldMeshOutput = std::filesystem::path(meshOutput).replace_extension(".scafflod.obj").string();
+        OpenMesh::IO::Options wOpts;
+        wOpts += OpenMesh::IO::Options::VertexTexCoord;
+        if (!OpenMesh::IO::write_mesh(scaffoldUVMesh, scaffoldMeshOutput, wOpts))
+        {
+            Logger::Error("Failed to write scaffold mesh: \"%s\"!", scaffoldMeshOutput.c_str());
+            return false;
+        }
+        Logger::Info("Successfully write scaffold mesh: \"%s\"!", scaffoldMeshOutput.c_str());
+    }
+
     OMT2D omt(&scaffoldUVMesh, targetAreas);
     if (!omt.Initialize())
     {
@@ -1436,6 +1448,8 @@ bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, co
     std::string hlbfgsMissOutput = std::filesystem::path(meshOutput).replace_extension(".hlbfgs.miss.txt").string();
     std::string gradientDescentMissOutput = std::filesystem::path(meshOutput).replace_extension(".gd.miss.txt").string();
 
+    std::string cellOutput = std::filesystem::path(meshOutput).replace_extension(".cell.png").string();
+
     omt.ShowAndSaveErrorFigure(omtErrorFigureOutput);
     omt.WriteHLBFGSErrorInfo(hlbfgsErrorOutput);
     omt.WriteGradientDescentErrorInfo(gradientDescentErrorOutput);
@@ -1443,6 +1457,8 @@ bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, co
     omt.ShowAndSaveMissingPointFigure(omtMissFigureOutput);
     omt.WriteHLBFGSMissingPointInfo(hlbfgsMissOutput);
     omt.WriteGradientDescentMissingPointInfo(gradientDescentMissOutput);
+
+    omt.WriteCellDecompositionImage(cellOutput);
 
     scaffoldUVMesh.request_face_status();
     scaffoldUVMesh.request_edge_status();

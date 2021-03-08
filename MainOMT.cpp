@@ -61,6 +61,8 @@ int main(int argc, const char ** argv)
     std::string hlbfgsMissOutput = std::filesystem::path(meshOutput).replace_extension(".hlbfgs.miss.txt").string();
     std::string gradientDescentMissOutput = std::filesystem::path(meshOutput).replace_extension(".gd.miss.txt").string();
 
+    std::string cellOutput = std::filesystem::path(meshOutput).replace_extension(".cell.png").string();
+
     /* ************************ parse and check args ************************ */
 
     /* ************************ load mesh ************************ */
@@ -108,6 +110,8 @@ int main(int argc, const char ** argv)
     omt.ShowAndSaveMissingPointFigure(omtMissFigureOutput);
     omt.WriteHLBFGSMissingPointInfo(hlbfgsMissOutput);
     omt.WriteGradientDescentMissingPointInfo(gradientDescentMissOutput);
+
+    omt.WriteCellDecompositionImage(cellOutput);
 
     /* ************************ show and write stats ************** */
 

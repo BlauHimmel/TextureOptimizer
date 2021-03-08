@@ -103,8 +103,10 @@ int main(int argc, const char ** argv)
     }
     Logger::Info("Successfully load mesh: \"%s\"!", meshFilename.c_str());
 
-    Logger::Info("Mesh info: %zd vertices, %zd faces, and %zd edges, euler %d, genus %d.",
-                 mesh.n_vertices(), mesh.n_faces(), mesh.n_edges(), GetMeshEuler(&mesh), GetMeshGenus(&mesh));
+    double PE = ComputePackingEfficiency(&mesh);
+
+    Logger::Info("Mesh info: %zd vertices, %zd faces, and %zd edges, euler %d, genus %d, PE %lf.",
+                 mesh.n_vertices(), mesh.n_faces(), mesh.n_edges(), GetMeshEuler(&mesh), GetMeshGenus(&mesh), PE);
 
     /* ************************ load mesh ************************ */
 

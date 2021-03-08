@@ -986,3 +986,28 @@ bool IsDiskTopology(const TriMesh * pMesh)
     size_t boundary = MeshBoundaryCount(pMesh);
     return genus == 0 && euler == 1 && comp == 1 && boundary == 1;
 }
+
+double ComputePackingEfficiency(const TriMesh * pMesh)
+{
+    Real totalAtlasArea = 1.0;
+    Real atlasArea = 0.0;
+
+    for (const auto & fh : pMesh->faces())
+    {
+        std::vector<TriMesh::Point> v;
+
+        for (const auto heh : pMesh->fh_range(fh))
+        {
+            const auto & uv = pMesh->texcoord2D(heh);
+            v.emplace_back( uv[0], uv[1], 0.0f );
+        }
+
+        const auto l1 = v[1] - v[0];
+        const auto l2 = v[2] - v[0];
+
+        atlasArea += l1.cross(l2).norm() * 0.5;
+    }
+
+    double PE = atlasArea / totalAtlasArea;
+    return PE;
+}

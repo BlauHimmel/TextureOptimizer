@@ -178,9 +178,9 @@ void MeshMeasure::AreaDistortion(const TriMesh * pMesh, const std::string & stat
 
     matplotlibcpp::figure_size(480, 360);
     matplotlibcpp::hist(areaDistortions, 1000);
-    matplotlibcpp::title("Area distortion");
     matplotlibcpp::save(figureOutput);
     matplotlibcpp::show();
+
     Logger::Info("Successfully write area distortion figure: \"%s\"!", figureOutput.c_str());
 }
 
@@ -359,9 +359,9 @@ void MeshMeasure::AngleDistortion(const TriMesh * pMesh, const std::string & sta
 
     matplotlibcpp::figure_size(480, 360);
     matplotlibcpp::hist(angleDistortions, 1000);
-    matplotlibcpp::title("Angle distortion");
     matplotlibcpp::save(figureOutput);
     matplotlibcpp::show();
+
     Logger::Info("Successfully write angle distortion figure: \"%s\"!", figureOutput.c_str());
 }
 
@@ -608,9 +608,9 @@ void MeshMeasure::SymmetricDirichletDistortion(const TriMesh * pMesh, const std:
 
     matplotlibcpp::figure_size(480, 360);
     matplotlibcpp::hist(symmetricDirichletDistortions, 1000);
-    matplotlibcpp::title("Symmetric Dirichlet distortion");
     matplotlibcpp::save(figureOutput);
     matplotlibcpp::show();
+
     Logger::Info("Successfully write symmetric Dirichlet distortion figure: \"%s\"!", figureOutput.c_str());
 }
 
@@ -759,7 +759,6 @@ void MeshMeasure::EnergyStats(const TriMesh * pMesh, size_t clusterNum, const st
         uvMesh.add_face(faceVHs);
     }
 
-    std::vector<std::vector<OpenMesh::VertexHandle>> componentsVHs = MeshComponentVertices(&uvMesh);
     Real totalAtlasArea = 1.0;
     Real atlasArea = 0.0;
     for (const auto & fh : uvMesh.faces())

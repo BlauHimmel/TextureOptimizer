@@ -38,4 +38,6 @@ bool TextureIntegrate(const TriMesh * pOriginMesh, const TriMesh * pNewMesh, Tex
 
 bool IsDiskTopology(const TriMesh * pMesh);
 
+double ComputePackingEfficiency(const TriMesh * pMesh);
+
 #endif //MESH_UTILS_HPP

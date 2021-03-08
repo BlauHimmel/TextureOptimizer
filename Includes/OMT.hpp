@@ -80,6 +80,8 @@ public:
     void WriteGradientDescentMissingPointInfo(const std::string & filename);
     void ShowAndSaveErrorFigure(const std::string & filename);
     void ShowAndSaveMissingPointFigure(const std::string & filename);
+    void WriteCellDecompositionImage(const std::string & filename);
+
 private:
     TriMesh * m_pMesh = nullptr;
     GLFWwindow * m_pWindow = nullptr;
@@ -92,6 +94,7 @@ private:
     std::vector<std::pair<double, double>> m_ErrorsGradientDescent;
     std::vector<std::pair<double, uint32_t>> m_MissingPointHLBFGS;
     std::vector<std::pair<double, uint32_t>> m_MissingPointGradientDescent;
+    std::unique_ptr<uint8_t[]> m_RenderTargetPixel;
 
     std::vector<float> m_TargetAreas;
     std::vector<Plane> m_InitialPlanes;
