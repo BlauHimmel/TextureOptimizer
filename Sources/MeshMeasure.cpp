@@ -8,7 +8,7 @@
 #include "Logger.hpp"
 #include "MeshUtils.hpp"
 
-void MeshMeasure::AreaDistortion(const TriMesh * pMesh, const std::string & statsOutput, const std::string & figureOutput)
+void MeshMeasure::AreaDistortion(const TriMesh * pMesh, const std::string & statsOutput, const std::string & figureOutput, const std::string & screenshotDir)
 {
     std::vector<float> areaDistortions(pMesh->n_vertices(), 0.0f);
 
@@ -148,7 +148,7 @@ void MeshMeasure::AreaDistortion(const TriMesh * pMesh, const std::string & stat
         V(i, 2) = point[2];
     }
 
-    DisplayVFC(V, F, C, Logger::Format("Area Distortion (Mesh) [%f, %f]", minDistortion, maxDistortion));
+    DisplayVFC(V, F, C, Logger::Format("Area Distortion (Mesh) [%f, %f]", minDistortion, maxDistortion), "AreaDistortion", screenshotDir);
 
     for (int i = 0; i < pMesh->n_vertices(); i++)
     {
@@ -166,7 +166,7 @@ void MeshMeasure::AreaDistortion(const TriMesh * pMesh, const std::string & stat
         }
     }
 
-    DisplayVFC(V, F, C, Logger::Format("Area Distortion (UV) [%f, %f]", minDistortion, maxDistortion));
+    DisplayVFC(V, F, C, Logger::Format("Area Distortion (UV) [%f, %f]", minDistortion, maxDistortion), "AreaDistortionUV", screenshotDir);
 
     std::ofstream statsFile(statsOutput);
     for (float areaDistortion : areaDistortions)
@@ -184,7 +184,7 @@ void MeshMeasure::AreaDistortion(const TriMesh * pMesh, const std::string & stat
     Logger::Info("Successfully write area distortion figure: \"%s\"!", figureOutput.c_str());
 }
 
-void MeshMeasure::AngleDistortion(const TriMesh * pMesh, const std::string & statsOutput, const std::string & figureOutput)
+void MeshMeasure::AngleDistortion(const TriMesh * pMesh, const std::string & statsOutput, const std::string & figureOutput, const std::string & screenshotDir)
 {
     std::vector<float> angleDistortions(pMesh->n_vertices(), 0.0f);
 
@@ -274,7 +274,7 @@ void MeshMeasure::AngleDistortion(const TriMesh * pMesh, const std::string & sta
         minDistortion = std::min(minDistortion, angleDistortion);
     }
 
-    maxDistortion = 1.0f;
+    maxDistortion = 2.0f;
 
     std::vector<float> normalizedAngleDistortions(pMesh->n_vertices(), 0.0f);
     for (size_t i = 0; i < angleDistortions.size(); i++)
@@ -329,7 +329,7 @@ void MeshMeasure::AngleDistortion(const TriMesh * pMesh, const std::string & sta
         V(i, 2) = point[2];
     }
 
-    DisplayVFC(V, F, C, Logger::Format("Angle Distortion (Mesh) [%f, %f]", minDistortion, maxDistortion));
+    DisplayVFC(V, F, C, Logger::Format("Angle Distortion (Mesh) [%f, %f]", minDistortion, maxDistortion), "AngleDistortion", screenshotDir);
 
     for (int i = 0; i < pMesh->n_vertices(); i++)
     {
@@ -347,7 +347,7 @@ void MeshMeasure::AngleDistortion(const TriMesh * pMesh, const std::string & sta
         }
     }
 
-    DisplayVFC(V, F, C, Logger::Format("Angle Distortion (UV) [%f, %f]", minDistortion, maxDistortion));
+    DisplayVFC(V, F, C, Logger::Format("Angle Distortion (UV) [%f, %f]", minDistortion, maxDistortion), "AngleDistortionUV", screenshotDir);
 
     std::ofstream statsFile(statsOutput);
     for (float angleDistortion : angleDistortions)
@@ -497,7 +497,7 @@ private:
     }
 };
 
-void MeshMeasure::SymmetricDirichletDistortion(const TriMesh * pMesh, const std::string & statsOutput, const std::string & figureOutput)
+void MeshMeasure::SymmetricDirichletDistortion(const TriMesh * pMesh, const std::string & statsOutput, const std::string & figureOutput, const std::string & screenshotDir)
 {
     std::vector<float> symmetricDirichletDistortions(pMesh->n_faces(), 0.0f);
     std::vector<Jacobian::Singular> singularValues = Jacobian::ComputeSingularValues(pMesh);
@@ -523,7 +523,7 @@ void MeshMeasure::SymmetricDirichletDistortion(const TriMesh * pMesh, const std:
         minDistortion = std::min(minDistortion, symmetricDirichletDistortion);
     }
 
-    maxDistortion = 1.0f;
+    maxDistortion = 2.0f;
 
     std::vector<float> normalizedSymmetricDirichletDistortions(pMesh->n_faces(), 0.0f);
     for (size_t i = 0; i < normalizedSymmetricDirichletDistortions.size(); i++)
@@ -578,7 +578,7 @@ void MeshMeasure::SymmetricDirichletDistortion(const TriMesh * pMesh, const std:
         V(i, 2) = point[2];
     }
 
-    DisplayVFC(V, F, C, Logger::Format("Symmetric Dirichlet Distortion (Mesh) [%f, %f]", minDistortion, maxDistortion));
+    DisplayVFC(V, F, C, Logger::Format("Symmetric Dirichlet Distortion (Mesh) [%f, %f]", minDistortion, maxDistortion), "SymDistortion", screenshotDir);
 
     for (int i = 0; i < pMesh->n_vertices(); i++)
     {
@@ -596,7 +596,7 @@ void MeshMeasure::SymmetricDirichletDistortion(const TriMesh * pMesh, const std:
         }
     }
 
-    DisplayVFC(V, F, C, Logger::Format("Symmetric Dirichlet Distortion (UV) [%f, %f]", minDistortion, maxDistortion));
+    DisplayVFC(V, F, C, Logger::Format("Symmetric Dirichlet Distortion (UV) [%f, %f]", minDistortion, maxDistortion), "SymDistortionUV", screenshotDir);
 
     std::ofstream statsFile(statsOutput);
     for (float symmetricDirichletDistortion : symmetricDirichletDistortions)
@@ -715,7 +715,7 @@ double ComputeSignalApproximationError(const TriMesh * pMesh, const TriMesh * pU
     return error;
 }
 
-void MeshMeasure::EnergyStats(const TriMesh * pMesh, size_t clusterNum, const std::string & statsOutput)
+void MeshMeasure::EnergyStats(const TriMesh * pMesh, size_t clusterNum, const std::string & statsOutput, float totalTime)
 {
     TriMesh uvMesh;
     std::vector<OpenMesh::VertexHandle> vhs;
@@ -830,5 +830,6 @@ void MeshMeasure::EnergyStats(const TriMesh * pMesh, size_t clusterNum, const st
     energyStatsFile << "BL: " << BL << std::endl;
     energyStatsFile << "Ed: " << Ed << std::endl;
     energyStatsFile << "SAE: " << SAE << std::endl;
+    energyStatsFile << "Time: " << totalTime << std::endl;
     energyStatsFile.close();
 }

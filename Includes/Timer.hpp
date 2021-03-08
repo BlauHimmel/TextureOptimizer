@@ -3,6 +3,7 @@
 
 #include <string>
 #include <chrono>
+#include <Windows.h>
 
 /**
 * \brief Simple timer with millisecond precision
@@ -37,5 +38,34 @@ private:
     std::chrono::system_clock::time_point m_Start;
 };
 
+class TimerV2
+{
+public:
+
+    TimerV2();
+
+public:
+
+    float TotalTime() const;
+    float DeltaTime() const;
+
+    void Reset();
+    void Start();
+    void Stop();
+    void Tick();
+
+private:
+
+    double m_SecondsPerCount;
+    double m_DeltaTime;
+
+    __int64 m_BaseTime;
+    __int64 m_PausedTime;
+    __int64 m_StopTime;
+    __int64 m_PrevTime;
+    __int64 m_CurrTime;
+
+    bool m_bStopped;
+};
 
 #endif //TIMER_H

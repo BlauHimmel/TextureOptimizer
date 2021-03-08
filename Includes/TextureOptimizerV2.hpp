@@ -4,6 +4,7 @@
 #include "Declaration.hpp"
 #include "Texture.hpp"
 #include "MeshUtils.hpp"
+#include "Timer.hpp"
 
 #include <memory>
 #include <unordered_map>
@@ -28,7 +29,7 @@ public:
 private:
     [[maybe_unused]] static std::unique_ptr<AtlasInfo> MarkAtlasIndex(TriMesh * pMesh);
     [[maybe_unused]] static size_t MergeAtlas(TriMesh * pMesh, AtlasInfo * pAtlasInfo);
-    static std::unique_ptr<AtlasInfo> MeshClustering(TriMesh * pMesh, double clusterThreshold);
+    static std::unique_ptr<AtlasInfo> MeshClustering(TriMesh * pMesh, double clusterThreshold, const std::string & screenshotDir, TimerV2 * pTimer);
     static std::unique_ptr<TriMesh[]> CreateSubMeshFromAtlas(const TriMesh * pMesh, AtlasInfo * pAtlasInfo);
     [[maybe_unused]] static bool MergeResultAndWrite(const TriMesh * pMeshes, const Texture * pTextures, const Real * pSizeCoeffs,
         const Real * uvWidths, const Real * uvHeights, size_t clusterNum, uint32_t mergedTextureWidth, uint32_t mergedTextureHeight,
@@ -37,9 +38,9 @@ private:
     static bool MergeResultAndWriteV2(const TriMesh * pMeshes, const Texture * pTextures,
         size_t clusterNum, uint32_t mergedTextureWidth, uint32_t mergedTextureHeight,
         uint32_t mergedTextureChannels, const std::string & meshOutput, const std::string & textureOutput,
-        TriMesh * pMergedMesh, Texture * pMergedTexture);
+        TriMesh * pMergedMesh, Texture * pMergedTexture, TimerV2 * pTimer);
     static bool FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, const Texture * pMergedTexture, size_t clusterNum,
-        double omtThreshold, const std::string & meshOutput, const std::string & textureOutput);
+        double omtThreshold, const std::string & meshOutput, const std::string & textureOutput, const std::string & screenshotDir, TimerV2 * pTimer);
 
 private:
     static void MergeAtlasInfoAndFProperty(AtlasInfo * pAtlasInfo, TriMesh * pMesh, OpenMesh::FPropHandleT<size_t> & fprop, size_t source, size_t target);
@@ -53,6 +54,8 @@ private:
 private:
     TriMesh * m_pMesh;
     Texture * m_pTexture;
+
+    TimerV2 m_Timer;
 };
 
 #endif //TEXTURE_OPTIMIZER_V2_HPP

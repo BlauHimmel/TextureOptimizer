@@ -1,4 +1,4 @@
-#pragma warning(disable:4067 4244)
+#pragma warning(disable:4067 4244 4005)
 #include "OMT.hpp"
 
 #include <memory>

@@ -26,6 +26,11 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
         return false;
     }
 
+    m_Timer.Reset();
+
+    std::string screenShotDir = meshOutput;
+    screenShotDir = screenShotDir.substr(0, screenShotDir.find_last_of('\\') + 1);
+
     Logger::Info("Removing small components of the mesh...");
     RemoveSmallComponent(m_pMesh);
     Logger::Info("<RemoveSmallComponent> Completed!");
@@ -38,7 +43,7 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
     Logger::Info("<RepairNonManifold> Completed!");
 
     Logger::Info("Clustering the mesh...");
-    std::unique_ptr<AtlasInfo> atlasInfo = MeshClustering(m_pMesh, clusterThreshold);
+    std::unique_ptr<AtlasInfo> atlasInfo = MeshClustering(m_pMesh, clusterThreshold, screenShotDir, &m_Timer);
     if (atlasInfo == nullptr)
     {
         Logger::Error("Error occurred when clustering the mesh.");
@@ -167,6 +172,7 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
         Logger::Info("Submesh %zd completed!", i);
     }
 
+    m_Timer.Stop();
     for (size_t i = 0; i < atlasInfo->atlasNum; i++)
     {
         std::string submeshOutput = meshOutput;
@@ -194,6 +200,7 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
         }
         Logger::Info("Successfully write subtexture [%zd]: \"%s\"!", i, subtextureOutput.c_str());
     }
+    m_Timer.Start();
 
     std::string mergedMeshOutput = meshOutput;
     std::string mergedTextureOutput = textureOutput;
@@ -211,7 +218,7 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
 
     Logger::Info("Merging submeshes and textures...");
     if (!MergeResultAndWriteV2(subMeshes.get(), subTextures.get(), atlasInfo->atlasNum, mergedTextureWidth, mergedTextureHeight,
-        mergedTextureChannels, mergedMeshOutput, mergedTextureOutput, &mergedMesh, &mergedTexture))
+        mergedTextureChannels, mergedMeshOutput, mergedTextureOutput, &mergedMesh, &mergedTexture, &m_Timer))
     {
         Logger::Error("Error occurred when merging submeshes and textures.");
         return false;
@@ -228,7 +235,7 @@ bool TextureOptimizerV2::Run(uint32_t width, uint32_t height, EParameterization 
     if (parameterization != EParameterization::ESMI04 && parameterization != EParameterization::EBarycentric)
     {
         Logger::Info("Further optimizing the merged mesh and the merged textures...");
-        if (!FurtherOptimizeAndWrite(&mergedMesh, &mergedTexture, atlasInfo->atlasNum, omtThreshold, optMergedMeshOutput, optMergedTextureOutput))
+        if (!FurtherOptimizeAndWrite(&mergedMesh, &mergedTexture, atlasInfo->atlasNum, omtThreshold, optMergedMeshOutput, optMergedTextureOutput, screenShotDir, &m_Timer))
         {
             Logger::Error("Error occurred when further optimizing the merged mesh and the merged textures.");
             return false;
@@ -356,7 +363,7 @@ struct TexCoord2DHasher
     Logger::Info("%d atlas found.", atlasInfo->atlasNum);
 
     /* visualization used for debug */
-    DisplayAtlas(pMesh, atlasInfo->atlasNum, MESH_FPROP_ATLAS_INDEX, "Atlas - Before Merge");
+    //DisplayAtlas(pMesh, atlasInfo->atlasNum, MESH_FPROP_ATLAS_INDEX, "Atlas - Before Merge");
 
     return atlasInfo;
 }
@@ -656,12 +663,12 @@ struct TexCoord2DHasher
     RemapAtlasInfoKeyInSequence(pAtlasInfo, pMesh, atlasIdxFProp, atlasIdxSet);
 
     /* visualization used for debug */
-    DisplayAtlas(pMesh, pAtlasInfo->atlasNum, MESH_FPROP_ATLAS_INDEX, "Atlas - After Merge");
+    //DisplayAtlas(pMesh, pAtlasInfo->atlasNum, MESH_FPROP_ATLAS_INDEX, "Atlas - After Merge");
 
     return pAtlasInfo->atlasNum;
 }
 
-std::unique_ptr<AtlasInfo> TextureOptimizerV2::MeshClustering(TriMesh * pMesh, double clusterThreshold)
+std::unique_ptr<AtlasInfo> TextureOptimizerV2::MeshClustering(TriMesh * pMesh, double clusterThreshold, const std::string & screenshotDir, TimerV2 * pTimer)
 {
     if (pMesh == nullptr)
     {
@@ -702,7 +709,9 @@ std::unique_ptr<AtlasInfo> TextureOptimizerV2::MeshClustering(TriMesh * pMesh, d
     Logger::Info("Cluster count = %zd", atlasInfo->atlasNum);
 
     /* visualization used for debug */
-    DisplayAtlas(pMesh, atlasInfo->atlasNum, MESH_FPROP_ATLAS_INDEX, "Atlas - After Clustering");
+    pTimer->Stop();
+    DisplayAtlas(pMesh, atlasInfo->atlasNum, MESH_FPROP_ATLAS_INDEX, "Atlas - After Clustering", "Cluster", screenshotDir);
+    pTimer->Start();
 
     return atlasInfo;
 }
@@ -889,7 +898,7 @@ std::unique_ptr<TriMesh[]> TextureOptimizerV2::CreateSubMeshFromAtlas(const TriM
 bool TextureOptimizerV2::MergeResultAndWriteV2(const TriMesh * pMeshes, const Texture * pTextures,
     size_t clusterNum, uint32_t mergedTextureWidth, uint32_t mergedTextureHeight,
     uint32_t mergedTextureChannels, const std::string & meshOutput, const std::string & textureOutput,
-    TriMesh * pMergedMesh, Texture * pMergedTexture)
+    TriMesh * pMergedMesh, Texture * pMergedTexture, TimerV2 * pTimer)
 {
     if (pMeshes == nullptr || pTextures == nullptr || clusterNum == 0)
     {
@@ -1041,6 +1050,8 @@ bool TextureOptimizerV2::MergeResultAndWriteV2(const TriMesh * pMeshes, const Te
         }
     }
 
+    pTimer->Stop();
+
     std::filesystem::path textureOutputPath(textureOutput);
     std::string atlasSVGOutput = textureOutputPath.replace_extension(".svg").string();
 
@@ -1057,6 +1068,8 @@ bool TextureOptimizerV2::MergeResultAndWriteV2(const TriMesh * pMeshes, const Te
         mergedTexture.CopyTo(pMergedTexture);
     }
 
+    pTimer->Start();
+
     return bSuccessMesh && bSuccessTexture && bSuccessAtlasSVG;
 }
 
@@ -1069,7 +1082,7 @@ struct PointHasher
 };
 
 bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, const Texture * pMergedTexture, size_t clusterNum,
-    double omtThreshold, const std::string & meshOutput, const std::string & textureOutput)
+    double omtThreshold, const std::string & meshOutput, const std::string & textureOutput, const std::string & screenshotDir, TimerV2 * pTimer)
 {
     if (pMergedMesh == nullptr || pMergedTexture == nullptr)
     {
@@ -1344,8 +1357,10 @@ bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, co
             }
         }
 
-        DisplayVFC(VV, FF, CC, "Scaffold UV Mesh");
-        DisplayVF(V2, F2, "Scaffold");
+        pTimer->Stop();
+        DisplayVFC(VV, FF, CC, "Scaffold UV Mesh", "ScaffoldUV", screenshotDir);
+        DisplayVF(V2, F2, "Scaffold", "Scaffold", screenshotDir);
+        pTimer->Start();
     }
 
     /* Use OMT to optimize the scaffold uv mesh. */
@@ -1421,6 +1436,7 @@ bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, co
     }
 
     {
+        pTimer->Stop();
         std::string scaffoldMeshOutput = std::filesystem::path(meshOutput).replace_extension(".scafflod.obj").string();
         OpenMesh::IO::Options wOpts;
         wOpts += OpenMesh::IO::Options::VertexTexCoord;
@@ -1430,6 +1446,7 @@ bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, co
             return false;
         }
         Logger::Info("Successfully write scaffold mesh: \"%s\"!", scaffoldMeshOutput.c_str());
+        pTimer->Start();
     }
 
     OMT2D omt(&scaffoldUVMesh, targetAreas);
@@ -1450,6 +1467,8 @@ bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, co
 
     std::string cellOutput = std::filesystem::path(meshOutput).replace_extension(".cell.png").string();
 
+    pTimer->Stop();
+
     omt.ShowAndSaveErrorFigure(omtErrorFigureOutput);
     omt.WriteHLBFGSErrorInfo(hlbfgsErrorOutput);
     omt.WriteGradientDescentErrorInfo(gradientDescentErrorOutput);
@@ -1459,6 +1478,8 @@ bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, co
     omt.WriteGradientDescentMissingPointInfo(gradientDescentMissOutput);
 
     omt.WriteCellDecompositionImage(cellOutput);
+
+    pTimer->Start();
 
     scaffoldUVMesh.request_face_status();
     scaffoldUVMesh.request_edge_status();
@@ -1503,10 +1524,14 @@ bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, co
     std::string meshSymDirichletDistortionFigureOutput = std::filesystem::path(meshOutput).replace_extension(".symdirichlet.svg").string();
     std::string meshEnergyStatsOutput = std::filesystem::path(meshOutput).replace_extension(".energy.txt").string();
 
-    MeshMeasure::AreaDistortion(&furtherOptMesh, meshAreaDistortionStatsOutput, meshAreaDistortionFigureOutput);
-    MeshMeasure::AngleDistortion(&furtherOptMesh, meshAngleDistortionStatsOutput, meshAngleDistortionFigureOutput);
-    MeshMeasure::SymmetricDirichletDistortion(&furtherOptMesh, meshSymDirichletDistortionStatsOutput, meshSymDirichletDistortionFigureOutput);
-    MeshMeasure::EnergyStats(&furtherOptMesh, clusterNum, meshEnergyStatsOutput);
+    pTimer->Stop();
+
+    float totalTime = pTimer->TotalTime();
+
+    MeshMeasure::AreaDistortion(&furtherOptMesh, meshAreaDistortionStatsOutput, meshAreaDistortionFigureOutput, screenshotDir);
+    MeshMeasure::AngleDistortion(&furtherOptMesh, meshAngleDistortionStatsOutput, meshAngleDistortionFigureOutput, screenshotDir);
+    MeshMeasure::SymmetricDirichletDistortion(&furtherOptMesh, meshSymDirichletDistortionStatsOutput, meshSymDirichletDistortionFigureOutput, screenshotDir);
+    MeshMeasure::EnergyStats(&furtherOptMesh, clusterNum, meshEnergyStatsOutput, totalTime);
 
     std::filesystem::path textureOutputPath(textureOutput);
     std::string atlasSVGOutput = textureOutputPath.replace_extension(".svg").string();
@@ -1516,6 +1541,8 @@ bool TextureOptimizerV2::FurtherOptimizeAndWrite(const TriMesh * pMergedMesh, co
     bool bSuccessMesh = OpenMesh::IO::write_mesh(furtherOptMesh, meshOutput, wOpts);
     bool bSuccessTexture = furtherOptTexture.Write(textureOutput);
     bool bSuccessAtlasSVG = WriteAtlasSVG(&furtherOptMesh, clusterNum, 1000, atlasSVGOutput);
+
+    pTimer->Start();
 
     return bSuccessMesh && bSuccessTexture && bSuccessAtlasSVG;
 }

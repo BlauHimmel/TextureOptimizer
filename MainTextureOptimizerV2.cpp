@@ -104,9 +104,21 @@ int main(int argc, const char ** argv)
     Logger::Info("Successfully load mesh: \"%s\"!", meshFilename.c_str());
 
     double PE = ComputePackingEfficiency(&mesh);
+    int32_t euler = GetMeshEuler(&mesh);
+    int32_t genus = GetMeshGenus(&mesh);
 
     Logger::Info("Mesh info: %zd vertices, %zd faces, and %zd edges, euler %d, genus %d, PE %lf.",
-                 mesh.n_vertices(), mesh.n_faces(), mesh.n_edges(), GetMeshEuler(&mesh), GetMeshGenus(&mesh), PE);
+                 mesh.n_vertices(), mesh.n_faces(), mesh.n_edges(), euler, genus, PE);
+
+    std::string meshInfoOutput = std::filesystem::path(meshOutput).replace_extension(".mesh.txt").string();
+    std::ofstream infoFile(meshInfoOutput);
+    infoFile << "V: " << mesh.n_vertices() << std::endl;
+    infoFile << "F: " << mesh.n_faces() << std::endl;
+    infoFile << "E: " << mesh.n_edges() << std::endl;
+    infoFile << "euler: " << euler << std::endl;
+    infoFile << "genus: " << genus << std::endl;
+    infoFile << "PE: " << PE << std::endl;
+    infoFile.close();
 
     /* ************************ load mesh ************************ */
 

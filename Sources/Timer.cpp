@@ -68,3 +68,105 @@ std::string Timer::TimeString(double time, bool bPrecise)
     return os.str();
 }
 
+TimerV2::TimerV2() :
+        m_SecondsPerCount(0.0),
+        m_DeltaTime(-1.0),
+        m_BaseTime(0),
+        m_PausedTime(0),
+        m_StopTime(0),
+        m_PrevTime(0),
+        m_CurrTime(0),
+        m_bStopped(false)
+{
+    __int64 CountsPerSec;
+    QueryPerformanceFrequency((LARGE_INTEGER*)(&CountsPerSec));
+    m_SecondsPerCount = 1.0 / static_cast<double>(CountsPerSec);
+}
+
+
+float TimerV2::TotalTime() const
+{
+    //                     |<--paused time-->|						   ��
+    // ----*---------------*-----------------*------------*------------*------> time
+    //  m_BaseTime       m_StopTime        StartTime     m_StopTime    m_CurrTime
+    if (m_bStopped)
+    {
+        return static_cast<float>(double((m_StopTime - m_PausedTime) - m_BaseTime) * m_SecondsPerCount);
+    }
+
+        //                     |<--paused time-->|			  ��
+        // ----*---------------*-----------------*------------*------> time
+        //  m_BaseTime       m_StopTime        StartTime     m_CurrTime
+    else
+    {
+        return static_cast<float>(double((m_CurrTime - m_PausedTime) - m_BaseTime) * m_SecondsPerCount);
+    }
+}
+
+float TimerV2::DeltaTime() const
+{
+    return static_cast<float>(m_DeltaTime);
+}
+
+void TimerV2::Reset()
+{
+    __int64 CurrTime;
+    QueryPerformanceCounter((LARGE_INTEGER*)(&CurrTime));
+
+    m_BaseTime = CurrTime;
+    m_PrevTime = CurrTime;
+    m_StopTime = 0;
+    m_bStopped = false;
+}
+
+void TimerV2::Start()
+{
+    //                     |<-------d------->|
+    // ----*---------------*-----------------*------------> time
+    //  m_BaseTime       m_StopTime        StartTime
+    if (m_bStopped)
+    {
+        __int64 StartTime;
+        QueryPerformanceCounter((LARGE_INTEGER*)(&StartTime));
+
+        m_PausedTime += (StartTime - m_StopTime);
+
+        m_PrevTime = StartTime;
+        m_StopTime = 0;
+        m_bStopped = false;
+    }
+}
+
+void TimerV2::Stop()
+{
+    if (!m_bStopped)
+    {
+        __int64 CurrTime;
+        QueryPerformanceCounter((LARGE_INTEGER*)(&CurrTime));
+
+        m_StopTime = CurrTime;
+        m_bStopped = true;
+    }
+}
+
+void TimerV2::Tick()
+{
+    if (m_bStopped)
+    {
+        m_DeltaTime = 0.0;
+        return;
+    }
+
+    __int64 CurrTime;
+    QueryPerformanceCounter((LARGE_INTEGER*)(&CurrTime));
+
+    m_CurrTime = CurrTime;
+    m_DeltaTime = double(m_CurrTime - m_PrevTime) * m_SecondsPerCount;
+    m_PrevTime = m_CurrTime;
+
+    if (m_DeltaTime < 0.0)
+    {
+        m_DeltaTime = 0.0;
+    }
+}
+
