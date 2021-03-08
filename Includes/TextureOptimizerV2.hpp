@@ -26,8 +26,10 @@ public:
     bool Run(uint32_t width, uint32_t height, EParameterization parameterization, double clusterThreshold, double omtThreshold,
         const std::string & meshOutput, const std::string & textureOutput);
 
-private:
+public:
     [[maybe_unused]] static std::unique_ptr<AtlasInfo> MarkAtlasIndex(TriMesh * pMesh);
+
+private:
     [[maybe_unused]] static size_t MergeAtlas(TriMesh * pMesh, AtlasInfo * pAtlasInfo);
     static std::unique_ptr<AtlasInfo> MeshClustering(TriMesh * pMesh, double clusterThreshold, const std::string & screenshotDir, TimerV2 * pTimer);
     static std::unique_ptr<TriMesh[]> CreateSubMeshFromAtlas(const TriMesh * pMesh, AtlasInfo * pAtlasInfo);
